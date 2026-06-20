@@ -1,6 +1,4 @@
 #!/usr/bin/env sh
-set -euo pipefail
-
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 FRONTEND_DIR="$ROOT/frontend"
 BACKEND_DIST="$ROOT/backend/dist"
