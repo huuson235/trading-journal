@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { RouterLink } from 'vue-router'
 import type { JournalEntry, SortDirection, SortField } from '@/types/journal'
 import type { TimeframeSlot } from '@/api/journal'
 import { SESSIONS } from '@/types/journal'
@@ -130,7 +131,7 @@ watch(
               <th class="px-1 py-1.5" :class="anyRowExpanded ? 'min-w-[140px] w-[140px]' : 'w-[100px]'">HTF</th>
               <th class="px-1 py-1.5" :class="anyRowExpanded ? 'min-w-[140px] w-[140px]' : 'w-[100px]'">MTF</th>
               <th class="px-1 py-1.5" :class="anyRowExpanded ? 'min-w-[140px] w-[140px]' : 'w-[100px]'">LTF</th>
-              <th class="w-14 px-0.5 py-1.5" />
+              <th class="w-[72px] px-0.5 py-1.5" />
             </tr>
           </thead>
           <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -223,6 +224,17 @@ watch(
               </td>
               <td class="whitespace-nowrap px-0.5">
                 <div class="flex items-center justify-end gap-0.5">
+                  <RouterLink
+                    :to="{ name: 'entry-detail', params: { id: entry.id } }"
+                    target="_blank"
+                    :class="[actionBtn, 'opacity-70 group-hover:opacity-100']"
+                    title="Xem & chia sẻ"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                    </svg>
+                  </RouterLink>
                   <button
                     type="button"
                     :class="[
@@ -289,6 +301,17 @@ watch(
             />
           </div>
           <div class="flex items-center gap-1">
+            <RouterLink
+              :to="{ name: 'entry-detail', params: { id: entry.id } }"
+              target="_blank"
+              :class="[actionBtn, 'p-1']"
+              title="Xem & chia sẻ"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+            </RouterLink>
             <button
               type="button"
               :class="[

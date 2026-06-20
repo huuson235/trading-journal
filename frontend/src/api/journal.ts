@@ -7,6 +7,10 @@ export function fetchEntries() {
   return request<JournalEntry[]>('/api/entries')
 }
 
+export function fetchEntry(id: number) {
+  return request<JournalEntry>(`/api/entries/${id}`)
+}
+
 export function fetchPairs() {
   return request<string[]>('/api/pairs')
 }
