@@ -2,9 +2,8 @@
 module.exports = {
   apps: [
     {
-      name: 'backend',
-      script: 'npm',
-      args: 'run start',
+      name: 'trading-journal-backend',
+      script: 'npm run start',
       env: {
         NODE_ENV: 'production',
         PORT: 3001
