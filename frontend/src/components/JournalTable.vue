@@ -179,7 +179,7 @@ watch(
                   :class="[cellInput, 'no-spinner text-right font-medium', pnlClass(entry.pnl)]"
                 />
               </td>
-              <td class="max-w-[140px] align-middle px-0.5 pt-2">
+              <td class="max-w-[140px] align-middle px-0.5 pt-1">
                 <textarea
                   v-model="entry.note"
                   rows="1"
