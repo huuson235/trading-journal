@@ -93,7 +93,7 @@ watch(
       class="hidden overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 md:block"
     >
       <div class="overflow-x-auto">
-        <table class="w-full min-w-[820px] border-collapse text-left">
+        <table class="w-full min-w-[836px] border-collapse text-left">
           <thead>
             <tr class="border-b border-zinc-200 bg-zinc-50 text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-400">
               <th class="sticky left-0 z-20 w-9 bg-zinc-50 px-1.5 py-1.5 dark:bg-zinc-900/80">No.</th>
@@ -107,7 +107,7 @@ watch(
                   Session <span class="text-[9px]">{{ sortMark('session', sortField, sortDirection) }}</span>
                 </button>
               </th>
-              <th class="w-[60px] px-1.5 py-1.5">
+              <th class="w-[76px] px-1.5 py-1.5">
                 <button type="button" :class="[sortableTh, thClass('pair', sortField)]" @click="emit('sort', 'pair')">
                   Pair <span class="text-[9px]">{{ sortMark('pair', sortField, sortDirection) }}</span>
                 </button>
@@ -147,7 +147,7 @@ watch(
                   <option v-for="s in SESSIONS" :key="s" :value="s">{{ s }}</option>
                 </select>
               </td>
-              <td class="whitespace-nowrap px-0.5">
+              <td class="min-w-[76px] whitespace-nowrap px-0.5">
                 <PairInput
                   v-model="entry.pair"
                   :suggestions="pairSuggestions"
