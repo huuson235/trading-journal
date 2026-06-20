@@ -30,6 +30,10 @@ const collapsedRowIds = ref(new Set<number>())
 const cellInput =
   'w-full min-w-0 rounded border-0 bg-transparent px-1 py-0.5 text-[11px] sm:text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400/50 dark:focus:ring-indigo-500/50'
 
+const cellTextarea =
+  cellInput +
+  ' resize-none leading-snug break-words whitespace-pre-wrap [field-sizing:content] min-h-[1.25rem]'
+
 const cellSelect = cellInput + ' cursor-pointer'
 
 const mobileInput =
@@ -134,7 +138,6 @@ watch(
               v-for="entry in entries"
               :key="entry.id"
               class="group transition-colors hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30"
-              :class="isRowExpanded(entry.id) ? '' : 'h-8'"
             >
               <td class="sticky left-0 z-10 whitespace-nowrap bg-white px-1.5 font-mono text-[11px] text-zinc-400 group-hover:bg-zinc-50/80 dark:bg-zinc-900 dark:group-hover:bg-zinc-800/30">
                 {{ entry.no }}
@@ -176,16 +179,16 @@ watch(
                   :class="[cellInput, 'no-spinner text-right font-medium', pnlClass(entry.pnl)]"
                 />
               </td>
-              <td class="max-w-[140px] px-0.5">
-                <input
+              <td class="max-w-[140px] align-middle px-0.5 pt-2">
+                <textarea
                   v-model="entry.note"
-                  type="text"
+                  rows="1"
                   placeholder="—"
                   :readonly="readonly"
-                  :class="cellInput + ' truncate'"
+                  :class="cellTextarea"
                 />
               </td>
-              <td class="px-0.5">
+              <td class="align-middle px-0.5">
                 <TimeframeCell
                   v-model="entry.htf"
                   :entry-id="entry.id"
@@ -196,7 +199,7 @@ watch(
                   :remove-image-handler="readonly ? undefined : removeImageHandler"
                 />
               </td>
-              <td class="px-0.5">
+              <td class="align-middle px-0.5">
                 <TimeframeCell
                   v-model="entry.mtf"
                   :entry-id="entry.id"
@@ -207,7 +210,7 @@ watch(
                   :remove-image-handler="readonly ? undefined : removeImageHandler"
                 />
               </td>
-              <td class="px-0.5">
+              <td class="align-middle px-0.5">
                 <TimeframeCell
                   v-model="entry.ltf"
                   :entry-id="entry.id"
@@ -355,12 +358,12 @@ watch(
 
         <div class="mb-2">
           <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">Note</label>
-          <input
+          <textarea
             v-model="entry.note"
-            type="text"
+            rows="2"
             placeholder="Ghi chú giao dịch..."
             :readonly="readonly"
-            class="w-full rounded border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-800"
+            class="w-full resize-none rounded border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs leading-snug break-words whitespace-pre-wrap dark:border-zinc-700 dark:bg-zinc-800"
           />
         </div>
 

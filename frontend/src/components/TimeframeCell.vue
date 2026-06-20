@@ -19,8 +19,8 @@ const isFocused = ref(false)
 const showLightbox = ref(false)
 const uploading = ref(false)
 
-const inputClass =
-  'min-w-0 flex-1 border-0 bg-transparent p-0 text-[11px] leading-none text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-0 dark:text-zinc-300 dark:placeholder:text-zinc-500'
+const textareaClass =
+  'mt-1 min-w-0 flex-1 resize-none border-0 bg-transparent p-0 text-[11px] leading-snug break-words whitespace-pre-wrap placeholder:text-zinc-400 focus:outline-none focus:ring-0 [field-sizing:content] min-h-[1.25rem] dark:text-zinc-300 dark:placeholder:text-zinc-500'
 
 const hasImage = computed(() => Boolean(previewUrl.value))
 
@@ -140,12 +140,12 @@ async function removeImage() {
         <input type="file" accept="image/*" class="hidden" @change="onFileChange" />
       </label>
 
-      <input
+      <textarea
         v-model="model.text"
-        type="text"
+        rows="1"
         placeholder="..."
         :readonly="readonly"
-        :class="[inputClass, readonly ? 'cursor-default opacity-80' : '']"
+        :class="[textareaClass, readonly ? 'cursor-default opacity-80' : '']"
         @paste="onPaste"
       />
     </template>
@@ -195,12 +195,12 @@ async function removeImage() {
         —
       </span>
 
-      <input
+      <textarea
         v-model="model.text"
-        type="text"
+        rows="1"
         placeholder="..."
         :readonly="readonly"
-        :class="[inputClass, readonly ? 'cursor-default opacity-80' : '']"
+        :class="[textareaClass, readonly ? 'cursor-default opacity-80' : '']"
         @paste="onPaste"
       />
     </template>
