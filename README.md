@@ -45,10 +45,10 @@ journal/
 │   ├── data/          # journal.db (SQLite)
 │   ├── uploads/       # ảnh chart + ảnh nền
 │   ├── dist/          # frontend build (production)
+│   ├── ecosystem.config.cjs  # PM2 config
 │   └── .env           # AUTH_USERNAME, AUTH_PASSWORD
 ├── scripts/
 │   └── build.sh       # build frontend → backend/dist
-└── ecosystem.config.js  # PM2 config
 ```
 
 ## Yêu cầu
@@ -115,8 +115,8 @@ Truy cập: http://localhost:3001 — backend serve cả API lẫn static HTML.
 ### 3. PM2 (tùy chọn)
 
 ```bash
-# Từ thư mục gốc project, sau khi đã build frontend
-pm2 start ecosystem.config.js
+# Từ thư mục backend, sau khi đã build frontend
+cd backend && pm2 start ecosystem.config.cjs
 ```
 
 Cấu hình mặc định: port `3001`, `NODE_ENV=production`.

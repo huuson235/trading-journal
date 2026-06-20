@@ -45,10 +45,10 @@ journal/
 │   ├── data/          # journal.db (SQLite)
 │   ├── uploads/       # chart images + background images
 │   ├── dist/          # frontend build (production)
+│   ├── ecosystem.config.cjs  # PM2 config
 │   └── .env           # AUTH_USERNAME, AUTH_PASSWORD
 ├── scripts/
 │   └── build.sh       # build frontend → backend/dist
-└── ecosystem.config.js  # PM2 config
 ```
 
 ## Requirements
@@ -115,8 +115,8 @@ Open: http://localhost:3001 — the backend serves both the API and static HTML.
 ### 3. PM2 (optional)
 
 ```bash
-# From the project root, after building the frontend
-pm2 start ecosystem.config.js
+# From the backend directory, after building the frontend
+cd backend && pm2 start ecosystem.config.cjs
 ```
 
 Default config: port `3001`, `NODE_ENV=production`.
