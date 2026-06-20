@@ -4,6 +4,8 @@
 
 Personal trading journal — log trades, upload chart images, filter/sort by date, and customize the UI.
 
+![Trading Journal dashboard](docs/screenshot.png)
+
 ## Tech stack
 
 | Layer | Technology |
@@ -49,6 +51,8 @@ journal/
 │   └── .env           # AUTH_USERNAME, AUTH_PASSWORD
 ├── scripts/
 │   └── build.sh       # build frontend → backend/dist
+├── docs/
+│   └── screenshot.png # README screenshot
 ```
 
 ## Requirements

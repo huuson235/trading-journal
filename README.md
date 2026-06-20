@@ -4,6 +4,8 @@
 
 Ứng dụng nhật ký giao dịch cá nhân — ghi chép trade, upload ảnh chart, lọc/sắp xếp theo ngày, và tùy chỉnh giao diện.
 
+![Trading Journal dashboard](docs/screenshot.png)
+
 ## Tech stack
 
 | Phần | Công nghệ |
@@ -49,6 +51,8 @@ journal/
 │   └── .env           # AUTH_USERNAME, AUTH_PASSWORD
 ├── scripts/
 │   └── build.sh       # build frontend → backend/dist
+├── docs/
+│   └── screenshot.png # README screenshot
 ```
 
 ## Yêu cầu
