@@ -3,10 +3,12 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { fetchEntry } from '@/api/journal'
 import ImageLightbox from '@/components/ImageLightbox.vue'
+import { useAuth } from '@/composables/useAuth'
 import type { JournalEntry } from '@/types/journal'
 import { isoToDisplay } from '@/utils/date'
 
 const route = useRoute()
+const { isAuthenticated } = useAuth()
 
 const entry = ref<JournalEntry | null>(null)
 const loading = ref(true)
@@ -151,7 +153,10 @@ watch(entryId, loadEntry)
               <div class="text-[10px] font-medium uppercase tracking-wide text-zinc-400">R:R</div>
               <div class="mt-0.5 text-xl font-semibold tabular-nums">{{ formatRr(entry.rr) }}</div>
             </div>
-            <div class="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+            <div
+              v-if="isAuthenticated"
+              class="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
+            >
               <div class="text-[10px] font-medium uppercase tracking-wide text-zinc-400">PnL</div>
               <div :class="['mt-0.5 text-xl font-semibold tabular-nums', pnlClass(entry.pnl)]">
                 {{ formatPnl(entry.pnl) }}

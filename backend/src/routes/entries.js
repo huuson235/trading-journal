@@ -47,6 +47,10 @@ router.get('/entries/:id', (req, res) => {
   const visibleOnly = !isRequestAuthenticated(req)
   const entry = getEntryById(id, visibleOnly)
   if (!entry) return res.status(404).json({ error: 'Không tìm thấy entry' })
+  if (!isRequestAuthenticated(req)) {
+    res.json({ ...entry, pnl: null })
+    return
+  }
   res.json(entry)
 })
 
