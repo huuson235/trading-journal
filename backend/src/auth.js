@@ -30,6 +30,12 @@ export function isValidToken(token) {
   return Boolean(token && tokens.has(token))
 }
 
+export function isRequestAuthenticated(req) {
+  const header = req.headers.authorization
+  const token = header?.startsWith('Bearer ') ? header.slice(7) : null
+  return isValidToken(token)
+}
+
 export function validateCredentials(username, password) {
   return username === getAuthUsername() && password === getAuthPassword()
 }

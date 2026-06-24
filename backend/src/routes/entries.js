@@ -1,18 +1,17 @@
 import { Router } from 'express'
 import multer from 'multer'
 import path from 'path'
-import { requireAuth } from '../auth.js'
+import { isRequestAuthenticated, requireAuth } from '../auth.js'
 import { generateThumbnail, removeImageFiles } from '../images.js'
 import {
-  IMAGE_SLOTS,
   UPLOADS_DIR,
+  addEntryImage,
   createEntry,
   deleteEntry,
   getAllEntries,
   getDistinctPairs,
   getEntryById,
-  removeEntryImage,
-  setEntryImage,
+  removeEntryImageById,
   updateEntry,
 } from '../db.js'
 
@@ -22,8 +21,7 @@ const storage = multer.diskStorage({
   destination: UPLOADS_DIR,
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname) || '.png'
-    const slot = req.params.slot
-    cb(null, `${req.params.id}-${slot}-${Date.now()}${ext}`)
+    cb(null, `${req.params.id}-img-${Date.now()}${ext}`)
   },
 })
 
@@ -36,8 +34,9 @@ const upload = multer({
   },
 })
 
-router.get('/entries', (_req, res) => {
-  res.json(getAllEntries())
+router.get('/entries', (req, res) => {
+  const visibleOnly = !isRequestAuthenticated(req)
+  res.json(getAllEntries(visibleOnly))
 })
 
 router.get('/entries/:id', (req, res) => {
@@ -45,7 +44,8 @@ router.get('/entries/:id', (req, res) => {
   if (!Number.isFinite(id)) {
     return res.status(400).json({ error: 'ID không hợp lệ' })
   }
-  const entry = getEntryById(id)
+  const visibleOnly = !isRequestAuthenticated(req)
+  const entry = getEntryById(id, visibleOnly)
   if (!entry) return res.status(404).json({ error: 'Không tìm thấy entry' })
   res.json(entry)
 })
@@ -60,12 +60,11 @@ router.post('/entries', requireAuth, (req, res) => {
     date: req.body.date ?? today,
     session: req.body.session ?? 'Asia',
     pair: req.body.pair ?? '',
+    direction: req.body.direction ?? 'LONG',
     rr: req.body.rr ?? null,
     pnl: req.body.pnl ?? null,
     note: req.body.note ?? '',
-    htf: { text: '' },
-    mtf: { text: '' },
-    ltf: { text: '' },
+    visible: req.body.visible !== false,
   })
   res.status(201).json(entry)
 })
@@ -79,12 +78,11 @@ router.patch('/entries/:id', requireAuth, (req, res) => {
     date: req.body.date ?? existing.date,
     session: req.body.session ?? existing.session,
     pair: req.body.pair ?? existing.pair,
+    direction: req.body.direction ?? existing.direction,
     rr: req.body.rr !== undefined ? req.body.rr : existing.rr,
     pnl: req.body.pnl !== undefined ? req.body.pnl : existing.pnl,
     note: req.body.note ?? existing.note,
-    htf: { text: req.body.htf?.text ?? existing.htf.text },
-    mtf: { text: req.body.mtf?.text ?? existing.mtf.text },
-    ltf: { text: req.body.ltf?.text ?? existing.ltf.text },
+    visible: req.body.visible !== undefined ? req.body.visible : existing.visible,
   })
   res.json(entry)
 })
@@ -95,13 +93,8 @@ router.delete('/entries/:id', requireAuth, (req, res) => {
   res.status(204).end()
 })
 
-router.post('/entries/:id/images/:slot', requireAuth, upload.single('image'), async (req, res) => {
+router.post('/entries/:id/images', requireAuth, upload.single('image'), async (req, res) => {
   const id = Number(req.params.id)
-  const slot = req.params.slot
-
-  if (!IMAGE_SLOTS.includes(slot)) {
-    return res.status(400).json({ error: 'Slot không hợp lệ' })
-  }
   if (!getEntryById(id)) {
     return res.status(404).json({ error: 'Không tìm thấy entry' })
   }
@@ -111,7 +104,7 @@ router.post('/entries/:id/images/:slot', requireAuth, upload.single('image'), as
 
   try {
     await generateThumbnail(UPLOADS_DIR, req.file.filename)
-    const entry = setEntryImage(id, slot, req.file.filename)
+    const entry = addEntryImage(id, req.file.filename)
     res.json(entry)
   } catch (err) {
     removeImageFiles(UPLOADS_DIR, req.file.filename)
@@ -119,16 +112,15 @@ router.post('/entries/:id/images/:slot', requireAuth, upload.single('image'), as
   }
 })
 
-router.delete('/entries/:id/images/:slot', requireAuth, (req, res) => {
+router.delete('/entries/:id/images/:imageId', requireAuth, (req, res) => {
   const id = Number(req.params.id)
-  const slot = req.params.slot
-
-  if (!IMAGE_SLOTS.includes(slot)) {
-    return res.status(400).json({ error: 'Slot không hợp lệ' })
+  const imageId = Number(req.params.imageId)
+  if (!Number.isFinite(imageId)) {
+    return res.status(400).json({ error: 'ID ảnh không hợp lệ' })
   }
 
-  const entry = removeEntryImage(id, slot)
-  if (!entry) return res.status(404).json({ error: 'Không tìm thấy entry' })
+  const entry = removeEntryImageById(id, imageId)
+  if (!entry) return res.status(404).json({ error: 'Không tìm thấy entry hoặc ảnh' })
   res.json(entry)
 })
 
