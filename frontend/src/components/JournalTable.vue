@@ -141,12 +141,12 @@ function thClass(field: SortField, active: SortField) {
               v-for="entry in entries"
               :key="entry.id"
               class="group min-h-[2.25rem] transition-colors"
-              :class="[readonly ? 'hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30' : rowBgClass(entry.pnl), !entry.visible ? 'opacity-50' : '']"
+              :class="[rowBgClass(entry.pnl), !entry.visible ? 'opacity-50' : '']"
             >
-              <td :class="['sticky left-0 z-10 whitespace-nowrap px-1.5 py-1 font-mono text-[11px] text-zinc-400', readonly ? 'bg-white group-hover:bg-zinc-50/80 dark:bg-zinc-900 dark:group-hover:bg-zinc-800/30' : stickyCellClass(entry.pnl)]">
+              <td :class="['sticky left-0 z-10 whitespace-nowrap px-1.5 py-1 font-mono text-[11px] text-zinc-400', stickyCellClass(entry.pnl)]">
                 {{ entry.no }}
               </td>
-              <td :class="['sticky left-9 z-10 min-w-[104px] whitespace-nowrap px-0.5 py-1', readonly ? 'bg-white group-hover:bg-zinc-50/80 dark:bg-zinc-900 dark:group-hover:bg-zinc-800/30' : stickyCellClass(entry.pnl)]">
+              <td :class="['sticky left-9 z-10 min-w-[104px] whitespace-nowrap px-0.5 py-1', stickyCellClass(entry.pnl)]">
                 <DateInput v-model="entry.date" :input-class="cellInput" :readonly="readonly" />
               </td>
               <td class="whitespace-nowrap px-0.5 py-1">
@@ -286,7 +286,7 @@ function thClass(field: SortField, active: SortField) {
         v-for="entry in entries"
         :key="entry.id"
         class="rounded-lg border p-3 shadow-sm"
-        :class="[readonly ? 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900' : mobileCardClass(entry.pnl), !entry.visible ? 'opacity-50' : '']"
+        :class="[mobileCardClass(entry.pnl), !entry.visible ? 'opacity-50' : '']"
       >
         <div class="mb-2 flex items-center justify-between gap-2">
           <div class="flex items-center gap-2">
