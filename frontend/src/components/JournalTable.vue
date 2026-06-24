@@ -1,32 +1,26 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { JournalEntry, SortDirection, SortField } from '@/types/journal'
-import type { TimeframeSlot } from '@/api/journal'
-import { SESSIONS } from '@/types/journal'
-import TimeframeCell from './TimeframeCell.vue'
+import { DIRECTIONS, SESSIONS } from '@/types/journal'
+import ImagesCell from './ImagesCell.vue'
 import PairInput from './PairInput.vue'
 import DateInput from './DateInput.vue'
 
-const props = defineProps<{
+defineProps<{
   entries: JournalEntry[]
   pairSuggestions: string[]
   sortField: SortField
   sortDirection: SortDirection
   hasAnyEntries: boolean
-  imagesExpanded: boolean
   readonly?: boolean
-  uploadHandler?: (entryId: number, slot: TimeframeSlot, file: File) => Promise<void>
-  removeImageHandler?: (entryId: number, slot: TimeframeSlot) => Promise<void>
+  uploadHandler?: (entryId: number, file: File) => Promise<void>
+  removeImageHandler?: (entryId: number, imageId: number) => Promise<void>
 }>()
 
 const emit = defineEmits<{
   remove: [id: number]
   sort: [field: SortField]
 }>()
-
-const expandedRowIds = ref(new Set<number>())
-const collapsedRowIds = ref(new Set<number>())
 
 const cellInput =
   'w-full min-w-0 rounded border-0 bg-transparent px-1 py-0.5 text-[11px] sm:text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400/50 dark:focus:ring-indigo-500/50'
@@ -46,32 +40,15 @@ const sortableTh =
 const actionBtn =
   'rounded p-0.5 text-zinc-400 transition hover:bg-zinc-100 dark:hover:bg-zinc-800'
 
-const anyRowExpanded = computed(() =>
-  props.entries.some((e) => isRowExpanded(e.id)),
-)
-
-function isRowExpanded(id: number) {
-  if (props.imagesExpanded) return !collapsedRowIds.value.has(id)
-  return expandedRowIds.value.has(id)
-}
-
-function toggleRowExpand(id: number) {
-  if (props.imagesExpanded) {
-    const next = new Set(collapsedRowIds.value)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    collapsedRowIds.value = next
-  } else {
-    const next = new Set(expandedRowIds.value)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    expandedRowIds.value = next
-  }
-}
-
 function pnlClass(pnl: number | null) {
   if (pnl == null || pnl === 0) return 'text-zinc-500'
   return pnl > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+}
+
+function directionClass(direction: string) {
+  return direction === 'LONG'
+    ? 'text-emerald-600 dark:text-emerald-400'
+    : 'text-rose-600 dark:text-rose-400'
 }
 
 function sortMark(field: SortField, active: SortField, dir: SortDirection) {
@@ -82,23 +59,15 @@ function sortMark(field: SortField, active: SortField, dir: SortDirection) {
 function thClass(field: SortField, active: SortField) {
   return field === active ? 'text-indigo-600 dark:text-indigo-400' : ''
 }
-
-watch(
-  () => props.imagesExpanded,
-  (expanded) => {
-    if (expanded) collapsedRowIds.value = new Set()
-  },
-)
 </script>
 
 <template>
   <div class="space-y-3">
-    <!-- Desktop / Tablet: one row per trade -->
     <div
       class="hidden overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 md:block"
     >
       <div class="overflow-x-auto">
-        <table class="w-full min-w-[836px] border-collapse text-left">
+        <table class="w-full min-w-[860px] border-collapse text-left">
           <thead>
             <tr class="border-b border-zinc-200 bg-zinc-50 text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-400">
               <th class="sticky left-0 z-20 w-9 bg-zinc-50 px-1.5 py-1.5 dark:bg-zinc-900/80">No.</th>
@@ -117,6 +86,11 @@ watch(
                   Pair <span class="text-[9px]">{{ sortMark('pair', sortField, sortDirection) }}</span>
                 </button>
               </th>
+              <th class="w-[80px] px-1.5 py-1.5">
+                <button type="button" :class="[sortableTh, thClass('direction', sortField)]" @click="emit('sort', 'direction')">
+                  Dir <span class="text-[9px]">{{ sortMark('direction', sortField, sortDirection) }}</span>
+                </button>
+              </th>
               <th class="w-10 px-1.5 py-1.5 text-right">
                 <button type="button" :class="[sortableTh, 'justify-end', thClass('rr', sortField)]" @click="emit('sort', 'rr')">
                   R:R <span class="text-[9px]">{{ sortMark('rr', sortField, sortDirection) }}</span>
@@ -128,9 +102,7 @@ watch(
                 </button>
               </th>
               <th class="min-w-[80px] px-1.5 py-1.5">Note</th>
-              <th class="px-1 py-1.5" :class="anyRowExpanded ? 'min-w-[140px] w-[140px]' : 'w-[100px]'">HTF</th>
-              <th class="px-1 py-1.5" :class="anyRowExpanded ? 'min-w-[140px] w-[140px]' : 'w-[100px]'">MTF</th>
-              <th class="px-1 py-1.5" :class="anyRowExpanded ? 'min-w-[140px] w-[140px]' : 'w-[100px]'">LTF</th>
+              <th class="min-w-[120px] px-1.5 py-1.5">Images</th>
               <th class="w-[72px] px-0.5 py-1.5" />
             </tr>
           </thead>
@@ -139,6 +111,7 @@ watch(
               v-for="entry in entries"
               :key="entry.id"
               class="group transition-colors hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30"
+              :class="!entry.visible ? 'opacity-50' : ''"
             >
               <td class="sticky left-0 z-10 whitespace-nowrap bg-white px-1.5 font-mono text-[11px] text-zinc-400 group-hover:bg-zinc-50/80 dark:bg-zinc-900 dark:group-hover:bg-zinc-800/30">
                 {{ entry.no }}
@@ -159,6 +132,15 @@ watch(
                   placeholder="—"
                   :readonly="readonly"
                 />
+              </td>
+              <td class="min-w-[80px] whitespace-nowrap px-0.5">
+                <select
+                  v-model="entry.direction"
+                  :class="[cellSelect, 'font-medium', directionClass(entry.direction)]"
+                  :disabled="readonly"
+                >
+                  <option v-for="d in DIRECTIONS" :key="d" :value="d">{{ d }}</option>
+                </select>
               </td>
               <td class="whitespace-nowrap px-0.5">
                 <input
@@ -190,33 +172,9 @@ watch(
                 />
               </td>
               <td class="align-middle px-0.5">
-                <TimeframeCell
-                  v-model="entry.htf"
+                <ImagesCell
                   :entry-id="entry.id"
-                  timeframe="htf"
-                  :images-expanded="isRowExpanded(entry.id)"
-                  :readonly="readonly"
-                  :upload-handler="readonly ? undefined : uploadHandler"
-                  :remove-image-handler="readonly ? undefined : removeImageHandler"
-                />
-              </td>
-              <td class="align-middle px-0.5">
-                <TimeframeCell
-                  v-model="entry.mtf"
-                  :entry-id="entry.id"
-                  timeframe="mtf"
-                  :images-expanded="isRowExpanded(entry.id)"
-                  :readonly="readonly"
-                  :upload-handler="readonly ? undefined : uploadHandler"
-                  :remove-image-handler="readonly ? undefined : removeImageHandler"
-                />
-              </td>
-              <td class="align-middle px-0.5">
-                <TimeframeCell
-                  v-model="entry.ltf"
-                  :entry-id="entry.id"
-                  timeframe="ltf"
-                  :images-expanded="isRowExpanded(entry.id)"
+                  :images="entry.images"
                   :readonly="readonly"
                   :upload-handler="readonly ? undefined : uploadHandler"
                   :remove-image-handler="readonly ? undefined : removeImageHandler"
@@ -224,7 +182,31 @@ watch(
               </td>
               <td class="whitespace-nowrap px-0.5">
                 <div class="flex items-center justify-end gap-0.5">
+                  <button
+                    v-if="!readonly"
+                    type="button"
+                    :class="[
+                      actionBtn,
+                      entry.visible
+                        ? 'text-zinc-400 opacity-70 group-hover:opacity-100'
+                        : 'text-amber-500 opacity-100',
+                    ]"
+                    :title="entry.visible ? 'Đang hiện — click để ẩn khỏi người xem' : 'Đang ẩn — click để hiện'"
+                    @click="entry.visible = !entry.visible"
+                  >
+                    <svg v-if="entry.visible" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
+                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
+                      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                      <path d="M10.73 5.08A10.43 10.43 0 0 1 12.05 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+                      <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+                      <line x1="2" x2="22" y1="2" y2="22" />
+                    </svg>
+                  </button>
                   <RouterLink
+                    v-if="entry.visible"
                     :to="{ name: 'entry-detail', params: { id: entry.id } }"
                     target="_blank"
                     :class="[actionBtn, 'opacity-70 group-hover:opacity-100']"
@@ -235,22 +217,6 @@ watch(
                       <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                     </svg>
                   </RouterLink>
-                  <button
-                    type="button"
-                    :class="[
-                      actionBtn,
-                      isRowExpanded(entry.id)
-                        ? 'text-indigo-600 dark:text-indigo-400'
-                        : 'opacity-70 group-hover:opacity-100',
-                    ]"
-                    :title="isRowExpanded(entry.id) ? 'Thu gọn ảnh' : 'Expand ảnh'"
-                    @click="toggleRowExpand(entry.id)"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
-                      <path v-if="isRowExpanded(entry.id)" d="M4 14h6v6M14 4h6v6M14 10l7-7M3 21l7-7" />
-                      <path v-else d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-                    </svg>
-                  </button>
                   <button
                     v-if="!readonly"
                     type="button"
@@ -277,7 +243,7 @@ watch(
       </div>
     </div>
 
-    <!-- Mobile: compact card rows -->
+    <!-- Mobile -->
     <div class="space-y-2 md:hidden">
       <div
         v-if="entries.length === 0"
@@ -290,6 +256,7 @@ watch(
         v-for="entry in entries"
         :key="entry.id"
         class="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+        :class="!entry.visible ? 'opacity-50' : ''"
       >
         <div class="mb-2 flex items-center justify-between gap-2">
           <div class="flex items-center gap-2">
@@ -301,7 +268,22 @@ watch(
             />
           </div>
           <div class="flex items-center gap-1">
+            <button
+              v-if="!readonly"
+              type="button"
+              :class="[actionBtn, 'p-1', entry.visible ? '' : 'text-amber-500']"
+              :title="entry.visible ? 'Ẩn khỏi người xem' : 'Hiện cho người xem'"
+              @click="entry.visible = !entry.visible"
+            >
+              <svg v-if="entry.visible" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+                <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" />
+              </svg>
+              <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+                <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" /><path d="M10.73 5.08A10.43 10.43 0 0 1 12.05 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" /><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" /><line x1="2" x2="22" y1="2" y2="22" />
+              </svg>
+            </button>
             <RouterLink
+              v-if="entry.visible"
               :to="{ name: 'entry-detail', params: { id: entry.id } }"
               target="_blank"
               :class="[actionBtn, 'p-1']"
@@ -313,29 +295,14 @@ watch(
               </svg>
             </RouterLink>
             <button
-              type="button"
-              :class="[
-                actionBtn,
-                'p-1',
-                isRowExpanded(entry.id) ? 'text-indigo-600 dark:text-indigo-400' : '',
-              ]"
-              :title="isRowExpanded(entry.id) ? 'Thu gọn ảnh' : 'Expand ảnh'"
-              @click="toggleRowExpand(entry.id)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
-                <path v-if="isRowExpanded(entry.id)" d="M4 14h6v6M14 4h6v6M14 10l7-7M3 21l7-7" />
-                <path v-else d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-              </svg>
-            </button>
-            <button
               v-if="!readonly"
               type="button"
               class="rounded p-1 text-zinc-400 hover:bg-rose-50 hover:text-rose-500 dark:hover:bg-rose-950/50"
               @click="emit('remove', entry.id)"
             >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
-              <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-            </svg>
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
             </button>
           </div>
         </div>
@@ -357,16 +324,20 @@ watch(
             />
           </div>
           <div>
-            <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">R:R</label>
-            <input
-              v-model.number="entry.rr"
-              type="number"
-              step="any"
-              :readonly="readonly"
-              :class="mobileInput + ' no-spinner'"
-            />
+            <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">Direction</label>
+            <select
+              v-model="entry.direction"
+              :class="[mobileInput, 'font-medium', directionClass(entry.direction)]"
+              :disabled="readonly"
+            >
+              <option v-for="d in DIRECTIONS" :key="d" :value="d">{{ d }}</option>
+            </select>
           </div>
           <div>
+            <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">R:R</label>
+            <input v-model.number="entry.rr" type="number" step="any" :readonly="readonly" :class="mobileInput + ' no-spinner'" />
+          </div>
+          <div class="col-span-2">
             <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">PnL</label>
             <input
               v-model.number="entry.pnl"
@@ -390,43 +361,15 @@ watch(
           />
         </div>
 
-        <div class="grid grid-cols-1 gap-1.5">
-          <div>
-            <label class="mb-0.5 block text-[10px] font-medium uppercase text-zinc-400">HTF</label>
-            <TimeframeCell
-              v-model="entry.htf"
-              :entry-id="entry.id"
-              timeframe="htf"
-              :images-expanded="isRowExpanded(entry.id)"
-              :readonly="readonly"
-              :upload-handler="readonly ? undefined : uploadHandler"
-              :remove-image-handler="readonly ? undefined : removeImageHandler"
-            />
-          </div>
-          <div>
-            <label class="mb-0.5 block text-[10px] font-medium uppercase text-zinc-400">MTF</label>
-            <TimeframeCell
-              v-model="entry.mtf"
-              :entry-id="entry.id"
-              timeframe="mtf"
-              :images-expanded="isRowExpanded(entry.id)"
-              :readonly="readonly"
-              :upload-handler="readonly ? undefined : uploadHandler"
-              :remove-image-handler="readonly ? undefined : removeImageHandler"
-            />
-          </div>
-          <div>
-            <label class="mb-0.5 block text-[10px] font-medium uppercase text-zinc-400">LTF</label>
-            <TimeframeCell
-              v-model="entry.ltf"
-              :entry-id="entry.id"
-              timeframe="ltf"
-              :images-expanded="isRowExpanded(entry.id)"
-              :readonly="readonly"
-              :upload-handler="readonly ? undefined : uploadHandler"
-              :remove-image-handler="readonly ? undefined : removeImageHandler"
-            />
-          </div>
+        <div>
+          <label class="mb-0.5 block text-[10px] font-medium uppercase text-zinc-400">Images</label>
+          <ImagesCell
+            :entry-id="entry.id"
+            :images="entry.images"
+            :readonly="readonly"
+            :upload-handler="readonly ? undefined : uploadHandler"
+            :remove-image-handler="readonly ? undefined : removeImageHandler"
+          />
         </div>
       </article>
     </div>

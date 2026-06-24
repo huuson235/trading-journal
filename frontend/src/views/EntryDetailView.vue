@@ -2,9 +2,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { fetchEntry } from '@/api/journal'
-import type { TimeframeSlot } from '@/api/journal'
 import ImageLightbox from '@/components/ImageLightbox.vue'
-import type { JournalEntry, TimeframeNote } from '@/types/journal'
+import type { JournalEntry } from '@/types/journal'
 import { isoToDisplay } from '@/utils/date'
 
 const route = useRoute()
@@ -13,7 +12,10 @@ const entry = ref<JournalEntry | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const copied = ref(false)
-const lightboxSrc = ref<string | null>(null)
+const lightboxIndex = ref(0)
+const showLightbox = ref(false)
+
+const imageUrls = computed(() => entry.value?.images.map((img) => img.imageUrl) ?? [])
 
 const entryId = computed(() => Number(route.params.id))
 
@@ -23,23 +25,15 @@ const shareUrl = computed(() =>
     : '',
 )
 
-const timeframes: { slot: TimeframeSlot; label: string; short: string }[] = [
-  { slot: 'htf', label: 'Higher Timeframe', short: 'HTF' },
-  { slot: 'mtf', label: 'Medium Timeframe', short: 'MTF' },
-  { slot: 'ltf', label: 'Lower Timeframe', short: 'LTF' },
-]
-
-function timeframeData(e: JournalEntry, slot: TimeframeSlot): TimeframeNote {
-  return e[slot]
-}
-
-function hasTimeframeContent(tf: TimeframeNote) {
-  return Boolean(tf.imageUrl || tf.text.trim())
-}
-
 function pnlClass(pnl: number | null) {
   if (pnl == null || pnl === 0) return 'text-zinc-500'
   return pnl > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+}
+
+function directionClass(direction: string) {
+  return direction === 'LONG'
+    ? 'text-emerald-600 dark:text-emerald-400'
+    : 'text-rose-600 dark:text-rose-400'
 }
 
 function formatPnl(pnl: number | null) {
@@ -139,6 +133,12 @@ watch(entryId, loadEntry)
             <span class="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
               {{ entry.session }}
             </span>
+            <span
+              class="rounded-full px-2.5 py-0.5 text-xs font-semibold"
+              :class="directionClass(entry.direction)"
+            >
+              {{ entry.direction }}
+            </span>
             <span class="text-xs text-zinc-400">{{ isoToDisplay(entry.date) }}</span>
           </div>
 
@@ -170,38 +170,28 @@ watch(entryId, loadEntry)
           </p>
         </section>
 
-        <section
-          v-for="tf in timeframes"
-          :key="tf.slot"
-          v-show="hasTimeframeContent(timeframeData(entry, tf.slot))"
-          class="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
-        >
-          <div class="border-b border-zinc-100 px-5 py-3 dark:border-zinc-800">
-            <h2 class="text-sm font-semibold">{{ tf.short }}</h2>
-            <p class="text-xs text-zinc-400">{{ tf.label }}</p>
-          </div>
-
-          <div v-if="timeframeData(entry, tf.slot).imageUrl" class="bg-zinc-100 dark:bg-zinc-950">
-            <button
-              type="button"
-              class="block w-full cursor-zoom-in"
-              @click="lightboxSrc = timeframeData(entry, tf.slot).imageUrl"
-            >
-              <img
-                :src="timeframeData(entry, tf.slot).imageUrl!"
-                :alt="`${tf.short} chart`"
-                class="mx-auto max-h-[70vh] w-full object-contain"
-                loading="lazy"
-              />
-            </button>
-          </div>
-
-          <p
-            v-if="timeframeData(entry, tf.slot).text.trim()"
-            class="border-t border-zinc-100 px-5 py-4 text-sm leading-relaxed text-zinc-600 dark:border-zinc-800 dark:text-zinc-400"
+        <section v-if="entry.images.length > 0" class="space-y-4">
+          <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-400">Charts</h2>
+          <div
+            v-for="(img, i) in entry.images"
+            :key="img.id"
+            class="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
           >
-            {{ timeframeData(entry, tf.slot).text }}
-          </p>
+            <div class="bg-zinc-100 dark:bg-zinc-950">
+              <button
+                type="button"
+                class="block w-full cursor-zoom-in"
+                @click="lightboxIndex = i; showLightbox = true"
+              >
+                <img
+                  :src="img.imageUrl"
+                  :alt="`Chart ${i + 1}`"
+                  class="mx-auto max-h-[70vh] w-full object-contain"
+                  loading="lazy"
+                />
+              </button>
+            </div>
+          </div>
         </section>
 
         <footer class="border-t border-zinc-200 pt-6 text-center text-xs text-zinc-400 dark:border-zinc-800">
@@ -211,10 +201,11 @@ watch(entryId, loadEntry)
     </main>
 
     <ImageLightbox
-      v-if="lightboxSrc"
-      :src="lightboxSrc"
+      v-if="showLightbox && imageUrls.length > 0"
+      :sources="imageUrls"
+      :start-index="lightboxIndex"
       alt="Chart"
-      @close="lightboxSrc = null"
+      @close="showLightbox = false"
     />
   </div>
 </template>

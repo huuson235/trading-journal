@@ -11,14 +11,12 @@ defineProps<{
   sortDirection: SortDirection
   resultCount: number
   totalCount: number
-  imagesExpanded: boolean
 }>()
 
 const emit = defineEmits<{
   resetWeek: []
   resetMonth: []
   sort: [field: SortField]
-  toggleExpand: []
 }>()
 
 const filterInput =
@@ -28,6 +26,7 @@ const sortFields: { key: SortField; label: string }[] = [
   { key: 'date', label: 'Date' },
   { key: 'session', label: 'Session' },
   { key: 'pair', label: 'Pair' },
+  { key: 'direction', label: 'Dir' },
   { key: 'rr', label: 'R:R' },
   { key: 'pnl', label: 'PnL' },
 ]
@@ -65,22 +64,6 @@ function sortIcon(field: SortField, activeField: SortField, direction: SortDirec
         @click="emit('resetMonth')"
       >
         Tháng này
-      </button>
-      <button
-        type="button"
-        class="inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs transition"
-        :class="
-          imagesExpanded
-            ? 'border-indigo-300 bg-indigo-50 font-medium text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300'
-            : 'border-zinc-200 text-zinc-600 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800'
-        "
-        @click="emit('toggleExpand')"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
-          <path v-if="imagesExpanded" d="M4 14h6v6M14 4h6v6M14 10l7-7M3 21l7-7" />
-          <path v-else d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-        </svg>
-        {{ imagesExpanded ? 'Thu gọn' : 'Expand' }}
       </button>
       <span class="ml-auto text-xs text-zinc-400">
         {{ resultCount }}/{{ totalCount }} giao dịch

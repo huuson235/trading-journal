@@ -40,6 +40,9 @@ export function sortEntries(
       case 'session':
         cmp = SESSIONS.indexOf(a.session) - SESSIONS.indexOf(b.session)
         break
+      case 'direction':
+        cmp = a.direction.localeCompare(b.direction)
+        break
     }
 
     return mul * cmp || a.id - b.id

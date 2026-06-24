@@ -1,7 +1,5 @@
 import { request } from './client'
-import type { JournalEntry, Session } from '@/types/journal'
-
-export type TimeframeSlot = 'htf' | 'mtf' | 'ltf'
+import type { Direction, JournalEntry, Session } from '@/types/journal'
 
 export function fetchEntries() {
   return request<JournalEntry[]>('/api/entries')
@@ -29,12 +27,11 @@ export function updateEntry(id: number, entry: JournalEntry) {
       date: entry.date,
       session: entry.session,
       pair: entry.pair,
+      direction: entry.direction,
       rr: entry.rr,
       pnl: entry.pnl,
       note: entry.note,
-      htf: { text: entry.htf.text },
-      mtf: { text: entry.mtf.text },
-      ltf: { text: entry.ltf.text },
+      visible: entry.visible,
     }),
   })
 }
@@ -43,19 +40,19 @@ export function deleteEntry(id: number) {
   return request<void>(`/api/entries/${id}`, { method: 'DELETE' })
 }
 
-export function uploadImage(id: number, slot: TimeframeSlot, file: File) {
+export function uploadImage(id: number, file: File) {
   const form = new FormData()
   form.append('image', file)
-  return request<JournalEntry>(`/api/entries/${id}/images/${slot}`, {
+  return request<JournalEntry>(`/api/entries/${id}/images`, {
     method: 'POST',
     body: form,
   })
 }
 
-export function deleteImage(id: number, slot: TimeframeSlot) {
-  return request<JournalEntry>(`/api/entries/${id}/images/${slot}`, {
+export function deleteImage(id: number, imageId: number) {
+  return request<JournalEntry>(`/api/entries/${id}/images/${imageId}`, {
     method: 'DELETE',
   })
 }
 
-export type { Session }
+export type { Session, Direction }

@@ -1,9 +1,10 @@
 export type Session = 'Asia' | 'London' | 'NYA' | 'NYL' | 'NYP'
+export type Direction = 'LONG' | 'SHORT'
 
-export interface TimeframeNote {
-  imageUrl: string | null
+export interface EntryImage {
+  id: number
+  imageUrl: string
   thumbUrl: string | null
-  text: string
 }
 
 export interface JournalEntry {
@@ -13,15 +14,16 @@ export interface JournalEntry {
   createdAt: string
   session: Session
   pair: string
+  direction: Direction
   rr: number | null
   pnl: number | null
   note: string
-  htf: TimeframeNote
-  mtf: TimeframeNote
-  ltf: TimeframeNote
+  visible: boolean
+  images: EntryImage[]
 }
 
 export const SESSIONS: Session[] = ['Asia', 'London', 'NYA', 'NYL', 'NYP']
+export const DIRECTIONS: Direction[] = ['LONG', 'SHORT']
 
-export type SortField = 'date' | 'pnl' | 'rr' | 'pair' | 'session'
+export type SortField = 'date' | 'pnl' | 'rr' | 'pair' | 'session' | 'direction'
 export type SortDirection = 'asc' | 'desc'

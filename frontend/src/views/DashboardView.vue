@@ -18,16 +18,15 @@ const {
   dateTo,
   sortField,
   sortDirection,
-  imagesExpanded,
   setSort,
   resetToCurrentWeek,
   resetToCurrentMonth,
-  toggleImagesExpanded,
   pairSuggestions,
   loading,
   error,
   totalPnl,
   winCount,
+  statsEntries,
   addEntry,
   removeEntry,
   uploadImage,
@@ -76,7 +75,7 @@ const readonly = computed(() => !isAuthenticated.value)
             <div class="h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
             <div>
               <span class="text-zinc-400">Win</span>
-              <span class="ml-1.5 font-semibold tabular-nums">{{ winCount }}/{{ visibleEntries.length }}</span>
+              <span class="ml-1.5 font-semibold tabular-nums">{{ winCount }}/{{ statsEntries.length }}</span>
             </div>
           </div>
 
@@ -126,7 +125,7 @@ const readonly = computed(() => !isAuthenticated.value)
         </div>
         <div>
           <span class="text-zinc-400">Win </span>
-          <span class="font-semibold tabular-nums">{{ winCount }}/{{ visibleEntries.length }}</span>
+          <span class="font-semibold tabular-nums">{{ winCount }}/{{ statsEntries.length }}</span>
         </div>
       </div>
     </header>
@@ -152,11 +151,9 @@ const readonly = computed(() => !isAuthenticated.value)
           :sort-direction="sortDirection"
           :result-count="visibleEntries.length"
           :total-count="entries.length"
-          :images-expanded="imagesExpanded"
           @reset-week="resetToCurrentWeek"
           @reset-month="resetToCurrentMonth"
           @sort="setSort"
-          @toggle-expand="toggleImagesExpanded"
         />
 
         <JournalTable
@@ -165,7 +162,6 @@ const readonly = computed(() => !isAuthenticated.value)
           :sort-field="sortField"
           :sort-direction="sortDirection"
           :has-any-entries="entries.length > 0"
-          :images-expanded="imagesExpanded"
           :readonly="readonly"
           :upload-handler="uploadImage"
           :remove-image-handler="removeImage"

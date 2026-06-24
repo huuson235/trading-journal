@@ -1,21 +1,11 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import type { JournalEntry, SortDirection, SortField } from '@/types/journal'
-import type { TimeframeSlot } from '@/api/journal'
 import * as journalApi from '@/api/journal'
 import { getAuthToken } from '@/api/client'
 import { debounce } from '@/utils/debounce'
 import { getCurrentMonthRange, getCurrentWeekRange } from '@/utils/date'
 import { filterEntriesByDate, sortEntries, toggleSort } from '@/utils/entriesView'
 import { useAuth } from '@/composables/useAuth'
-import type { TimeframeNote } from '@/types/journal'
-
-function mergeTimeframe(current: TimeframeNote, updated: TimeframeNote): TimeframeNote {
-  return {
-    text: updated.text,
-    imageUrl: updated.imageUrl,
-    thumbUrl: updated.thumbUrl,
-  }
-}
 
 const entries = ref<JournalEntry[]>([])
 const pairSuggestions = ref<string[]>([])
@@ -27,7 +17,6 @@ const dateFrom = ref(weekRange.from)
 const dateTo = ref(weekRange.to)
 const sortField = ref<SortField>('date')
 const sortDirection = ref<SortDirection>('desc')
-const imagesExpanded = ref(false)
 
 let skipSave = true
 const saveTimers = new Map<number, ReturnType<typeof setTimeout>>()
@@ -49,9 +38,7 @@ function queueSave(entry: JournalEntry) {
         entries.value[idx] = {
           ...current,
           ...updated,
-          htf: mergeTimeframe(current.htf, updated.htf),
-          mtf: mergeTimeframe(current.mtf, updated.mtf),
-          ltf: mergeTimeframe(current.ltf, updated.ltf),
+          images: updated.images,
         }
         await refreshPairs()
       } catch (e) {
@@ -113,12 +100,17 @@ export function useJournal() {
     return sortEntries(filtered, sortField.value, sortDirection.value)
   })
 
+  /** Chỉ entry public (visible) trong khoảng ngày — dùng cho PnL / Win */
+  const statsEntries = computed(() =>
+    visibleEntries.value.filter((e) => e.visible),
+  )
+
   const totalPnl = computed(() =>
-    visibleEntries.value.reduce((sum, e) => sum + pnlValue(e.pnl), 0),
+    statsEntries.value.reduce((sum, e) => sum + pnlValue(e.pnl), 0),
   )
 
   const winCount = computed(() =>
-    visibleEntries.value.filter((e) => pnlValue(e.pnl) > 0).length,
+    statsEntries.value.filter((e) => pnlValue(e.pnl) > 0).length,
   )
 
   function setSort(field: SortField) {
@@ -137,10 +129,6 @@ export function useJournal() {
     const range = getCurrentMonthRange()
     dateFrom.value = range.from
     dateTo.value = range.to
-  }
-
-  function toggleImagesExpanded() {
-    imagesExpanded.value = !imagesExpanded.value
   }
 
   const allPairSuggestions = computed(() => {
@@ -189,16 +177,16 @@ export function useJournal() {
     }
   }
 
-  async function uploadImage(entryId: number, slot: TimeframeSlot, file: File) {
+  async function uploadImage(entryId: number, file: File) {
     if (!isAuthenticated.value) return
-    const updated = await journalApi.uploadImage(entryId, slot, file)
+    const updated = await journalApi.uploadImage(entryId, file)
     const idx = entries.value.findIndex((e) => e.id === entryId)
     if (idx !== -1) entries.value[idx] = updated
   }
 
-  async function removeImage(entryId: number, slot: TimeframeSlot) {
+  async function removeImage(entryId: number, imageId: number) {
     if (!isAuthenticated.value) return
-    const updated = await journalApi.deleteImage(entryId, slot)
+    const updated = await journalApi.deleteImage(entryId, imageId)
     const idx = entries.value.findIndex((e) => e.id === entryId)
     if (idx !== -1) entries.value[idx] = updated
   }
@@ -206,15 +194,14 @@ export function useJournal() {
   return {
     entries,
     visibleEntries,
+    statsEntries,
     dateFrom,
     dateTo,
     sortField,
     sortDirection,
-    imagesExpanded,
     setSort,
     resetToCurrentWeek,
     resetToCurrentMonth,
-    toggleImagesExpanded,
     pairSuggestions: allPairSuggestions,
     loading,
     error,
