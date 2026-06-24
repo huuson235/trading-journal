@@ -23,11 +23,11 @@ const emit = defineEmits<{
 }>()
 
 const cellInput =
-  'w-full min-w-0 rounded border-0 bg-transparent px-1 py-0.5 text-[11px] sm:text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400/50 dark:focus:ring-indigo-500/50'
+  'w-full min-w-0 rounded border-0 bg-transparent px-1 py-1 text-[11px] sm:text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400/50 dark:focus:ring-indigo-500/50'
 
 const cellTextarea =
   cellInput +
-  ' resize-none leading-snug break-words whitespace-pre-wrap [field-sizing:content] min-h-[1.25rem]'
+  ' resize-none leading-snug break-words whitespace-pre-wrap [field-sizing:content] min-h-[1.5rem]'
 
 const cellSelect = cellInput + ' cursor-pointer'
 
@@ -43,6 +43,36 @@ const actionBtn =
 function pnlClass(pnl: number | null) {
   if (pnl == null || pnl === 0) return 'text-zinc-500'
   return pnl > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+}
+
+function rowBgClass(pnl: number | null) {
+  if (pnl == null || pnl === 0) {
+    return 'hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30'
+  }
+  if (pnl > 0) {
+    return 'bg-emerald-100 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-950/60'
+  }
+  return 'bg-rose-100 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-950/60'
+}
+
+function stickyCellClass(pnl: number | null) {
+  if (pnl == null || pnl === 0) {
+    return 'bg-white group-hover:bg-zinc-50/80 dark:bg-zinc-900 dark:group-hover:bg-zinc-800/30'
+  }
+  if (pnl > 0) {
+    return 'bg-emerald-100 group-hover:bg-emerald-100 dark:bg-emerald-950/50 dark:group-hover:bg-emerald-950/60'
+  }
+  return 'bg-rose-100 group-hover:bg-rose-100 dark:bg-rose-950/50 dark:group-hover:bg-rose-950/60'
+}
+
+function mobileCardClass(pnl: number | null) {
+  if (pnl == null || pnl === 0) {
+    return 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900'
+  }
+  if (pnl > 0) {
+    return 'border-emerald-300 bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50'
+  }
+  return 'border-rose-300 bg-rose-100 dark:border-rose-800 dark:bg-rose-950/50'
 }
 
 function directionClass(direction: string) {
@@ -67,7 +97,7 @@ function thClass(field: SortField, active: SortField) {
       class="hidden overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 md:block"
     >
       <div class="overflow-x-auto">
-        <table class="w-full min-w-[860px] border-collapse text-left">
+        <table class="w-full min-w-[952px] border-collapse text-left">
           <thead>
             <tr class="border-b border-zinc-200 bg-zinc-50 text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-400">
               <th class="sticky left-0 z-20 w-9 bg-zinc-50 px-1.5 py-1.5 dark:bg-zinc-900/80">No.</th>
@@ -96,13 +126,13 @@ function thClass(field: SortField, active: SortField) {
                   R:R <span class="text-[9px]">{{ sortMark('rr', sortField, sortDirection) }}</span>
                 </button>
               </th>
-              <th class="w-12 px-1.5 py-1.5 text-right">
+              <th v-if="!readonly" class="w-12 px-1.5 py-2 text-right">
                 <button type="button" :class="[sortableTh, 'justify-end', thClass('pnl', sortField)]" @click="emit('sort', 'pnl')">
                   PnL <span class="text-[9px]">{{ sortMark('pnl', sortField, sortDirection) }}</span>
                 </button>
               </th>
-              <th class="min-w-[80px] px-1.5 py-1.5">Note</th>
-              <th class="min-w-[120px] px-1.5 py-1.5">Images</th>
+              <th class="min-w-[160px] px-1.5 py-2">Note</th>
+              <th class="min-w-[180px] w-[180px] px-1.5 py-2">Images</th>
               <th class="w-[72px] px-0.5 py-1.5" />
             </tr>
           </thead>
@@ -110,21 +140,21 @@ function thClass(field: SortField, active: SortField) {
             <tr
               v-for="entry in entries"
               :key="entry.id"
-              class="group transition-colors hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30"
-              :class="!entry.visible ? 'opacity-50' : ''"
+              class="group min-h-[2.25rem] transition-colors"
+              :class="[readonly ? 'hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30' : rowBgClass(entry.pnl), !entry.visible ? 'opacity-50' : '']"
             >
-              <td class="sticky left-0 z-10 whitespace-nowrap bg-white px-1.5 font-mono text-[11px] text-zinc-400 group-hover:bg-zinc-50/80 dark:bg-zinc-900 dark:group-hover:bg-zinc-800/30">
+              <td :class="['sticky left-0 z-10 whitespace-nowrap px-1.5 py-1 font-mono text-[11px] text-zinc-400', readonly ? 'bg-white group-hover:bg-zinc-50/80 dark:bg-zinc-900 dark:group-hover:bg-zinc-800/30' : stickyCellClass(entry.pnl)]">
                 {{ entry.no }}
               </td>
-              <td class="sticky left-9 z-10 min-w-[104px] whitespace-nowrap bg-white px-0.5 group-hover:bg-zinc-50/80 dark:bg-zinc-900 dark:group-hover:bg-zinc-800/30">
+              <td :class="['sticky left-9 z-10 min-w-[104px] whitespace-nowrap px-0.5 py-1', readonly ? 'bg-white group-hover:bg-zinc-50/80 dark:bg-zinc-900 dark:group-hover:bg-zinc-800/30' : stickyCellClass(entry.pnl)]">
                 <DateInput v-model="entry.date" :input-class="cellInput" :readonly="readonly" />
               </td>
-              <td class="whitespace-nowrap px-0.5">
+              <td class="whitespace-nowrap px-0.5 py-1">
                 <select v-model="entry.session" :class="cellSelect" :disabled="readonly">
                   <option v-for="s in SESSIONS" :key="s" :value="s">{{ s }}</option>
                 </select>
               </td>
-              <td class="min-w-[76px] whitespace-nowrap px-0.5">
+              <td class="min-w-[76px] whitespace-nowrap px-0.5 py-1">
                 <PairInput
                   v-model="entry.pair"
                   :suggestions="pairSuggestions"
@@ -133,7 +163,7 @@ function thClass(field: SortField, active: SortField) {
                   :readonly="readonly"
                 />
               </td>
-              <td class="min-w-[80px] whitespace-nowrap px-0.5">
+              <td class="min-w-[80px] whitespace-nowrap px-0.5 py-1">
                 <select
                   v-model="entry.direction"
                   :class="[cellSelect, 'font-medium', directionClass(entry.direction)]"
@@ -142,7 +172,7 @@ function thClass(field: SortField, active: SortField) {
                   <option v-for="d in DIRECTIONS" :key="d" :value="d">{{ d }}</option>
                 </select>
               </td>
-              <td class="whitespace-nowrap px-0.5">
+              <td class="whitespace-nowrap px-0.5 py-1">
                 <input
                   v-model.number="entry.rr"
                   type="number"
@@ -152,7 +182,7 @@ function thClass(field: SortField, active: SortField) {
                   :class="cellInput + ' no-spinner text-right'"
                 />
               </td>
-              <td class="whitespace-nowrap px-0.5">
+              <td v-if="!readonly" class="whitespace-nowrap px-0.5 py-1">
                 <input
                   v-model.number="entry.pnl"
                   type="number"
@@ -162,7 +192,7 @@ function thClass(field: SortField, active: SortField) {
                   :class="[cellInput, 'no-spinner text-right font-medium', pnlClass(entry.pnl)]"
                 />
               </td>
-              <td class="max-w-[140px] align-middle px-0.5 pt-1">
+              <td class="min-w-[160px] max-w-[200px] align-middle px-0.5 py-1">
                 <textarea
                   v-model="entry.note"
                   rows="1"
@@ -171,7 +201,7 @@ function thClass(field: SortField, active: SortField) {
                   :class="cellTextarea"
                 />
               </td>
-              <td class="align-middle px-0.5">
+              <td class="min-w-[180px] w-[180px] align-middle px-0.5 py-1">
                 <ImagesCell
                   :entry-id="entry.id"
                   :images="entry.images"
@@ -180,7 +210,7 @@ function thClass(field: SortField, active: SortField) {
                   :remove-image-handler="readonly ? undefined : removeImageHandler"
                 />
               </td>
-              <td class="whitespace-nowrap px-0.5">
+              <td class="whitespace-nowrap px-0.5 py-1">
                 <div class="flex items-center justify-end gap-0.5">
                   <button
                     v-if="!readonly"
@@ -255,8 +285,8 @@ function thClass(field: SortField, active: SortField) {
       <article
         v-for="entry in entries"
         :key="entry.id"
-        class="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
-        :class="!entry.visible ? 'opacity-50' : ''"
+        class="rounded-lg border p-3 shadow-sm"
+        :class="[readonly ? 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900' : mobileCardClass(entry.pnl), !entry.visible ? 'opacity-50' : '']"
       >
         <div class="mb-2 flex items-center justify-between gap-2">
           <div class="flex items-center gap-2">
@@ -337,7 +367,7 @@ function thClass(field: SortField, active: SortField) {
             <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">R:R</label>
             <input v-model.number="entry.rr" type="number" step="any" :readonly="readonly" :class="mobileInput + ' no-spinner'" />
           </div>
-          <div class="col-span-2">
+          <div v-if="!readonly" class="col-span-2">
             <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">PnL</label>
             <input
               v-model.number="entry.pnl"

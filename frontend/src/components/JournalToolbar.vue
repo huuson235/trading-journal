@@ -29,6 +29,7 @@ const sortFields: { key: SortField; label: string }[] = [
   { key: 'direction', label: 'Dir' },
   { key: 'rr', label: 'R:R' },
   { key: 'pnl', label: 'PnL' },
+  { key: 'result', label: 'Kết quả' },
 ]
 
 function sortIcon(field: SortField, activeField: SortField, direction: SortDirection) {

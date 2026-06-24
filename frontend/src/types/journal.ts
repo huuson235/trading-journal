@@ -25,5 +25,5 @@ export interface JournalEntry {
 export const SESSIONS: Session[] = ['Asia', 'London', 'NYA', 'NYL', 'NYP']
 export const DIRECTIONS: Direction[] = ['LONG', 'SHORT']
 
-export type SortField = 'date' | 'pnl' | 'rr' | 'pair' | 'session' | 'direction'
+export type SortField = 'date' | 'pnl' | 'rr' | 'pair' | 'session' | 'direction' | 'result'
 export type SortDirection = 'asc' | 'desc'

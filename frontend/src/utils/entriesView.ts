@@ -14,6 +14,12 @@ function nullNumberOrder(value: number | null, dir: SortDirection): number {
   return value ?? (dir === 'asc' ? Infinity : -Infinity)
 }
 
+/** lose = -1, neutral = 0, win = 1 */
+function resultOrder(pnl: number | null): number {
+  if (pnl == null || pnl === 0) return 0
+  return pnl > 0 ? 1 : -1
+}
+
 export function sortEntries(
   entries: JournalEntry[],
   field: SortField,
@@ -43,6 +49,9 @@ export function sortEntries(
       case 'direction':
         cmp = a.direction.localeCompare(b.direction)
         break
+      case 'result':
+        cmp = resultOrder(a.pnl) - resultOrder(b.pnl)
+        break
     }
 
     return mul * cmp || a.id - b.id
@@ -57,5 +66,5 @@ export function toggleSort(
   if (currentField === field) {
     return { field, direction: currentDirection === 'asc' ? 'desc' : 'asc' }
   }
-  return { field, direction: field === 'date' ? 'desc' : 'asc' }
+  return { field, direction: field === 'date' || field === 'result' ? 'desc' : 'asc' }
 }

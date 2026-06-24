@@ -65,7 +65,7 @@ const readonly = computed(() => !isAuthenticated.value)
         </div>
 
         <div class="flex shrink-0 items-center gap-2 sm:gap-3">
-          <div class="hidden items-center gap-3 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs dark:border-zinc-800 sm:flex">
+          <div v-if="isAuthenticated" class="hidden items-center gap-3 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs dark:border-zinc-800 sm:flex">
             <div>
               <span class="text-zinc-400">PnL</span>
               <span :class="['ml-1.5 font-semibold tabular-nums', totalClass]">
@@ -77,6 +77,13 @@ const readonly = computed(() => !isAuthenticated.value)
               <span class="text-zinc-400">Win</span>
               <span class="ml-1.5 font-semibold tabular-nums">{{ winCount }}/{{ statsEntries.length }}</span>
             </div>
+          </div>
+          <div
+            v-else
+            class="hidden items-center rounded-lg border border-zinc-200 px-3 py-1.5 text-xs dark:border-zinc-800 sm:flex"
+          >
+            <span class="text-zinc-400">Win</span>
+            <span class="ml-1.5 font-semibold tabular-nums">{{ winCount }}/{{ statsEntries.length }}</span>
           </div>
 
           <button
@@ -117,7 +124,7 @@ const readonly = computed(() => !isAuthenticated.value)
       </div>
 
       <div class="flex items-center gap-4 border-t border-zinc-100 px-4 py-2 text-xs dark:border-zinc-800/80 sm:hidden">
-        <div>
+        <div v-if="isAuthenticated">
           <span class="text-zinc-400">PnL </span>
           <span :class="['font-semibold tabular-nums', totalClass]">
             {{ totalPnl >= 0 ? '+' : '' }}{{ totalPnl.toFixed(1) }}

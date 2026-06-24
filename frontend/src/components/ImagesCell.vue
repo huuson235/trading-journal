@@ -63,7 +63,7 @@ function openLightbox(index: number) {
 
 <template>
   <div
-    class="group/cell flex min-w-[100px] flex-wrap items-center gap-1 rounded border border-transparent px-1 py-0.5 transition-colors"
+    class="group/cell flex w-full min-w-0 flex-nowrap items-center gap-1 rounded border border-transparent px-1 py-1 transition-colors"
     :class="
       isFocused
         ? 'border-zinc-300 bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-900/60'
