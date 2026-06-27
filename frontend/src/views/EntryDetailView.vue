@@ -6,6 +6,7 @@ import ImageLightbox from '@/components/ImageLightbox.vue'
 import { useAuth } from '@/composables/useAuth'
 import type { JournalEntry } from '@/types/journal'
 import { isoToDisplay } from '@/utils/date'
+import { getTagClass } from '@/utils/tagStyles'
 
 const route = useRoute()
 const { isAuthenticated } = useAuth()
@@ -30,12 +31,6 @@ const shareUrl = computed(() =>
 function pnlClass(pnl: number | null) {
   if (pnl == null || pnl === 0) return 'text-zinc-500'
   return pnl > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
-}
-
-function directionClass(direction: string) {
-  return direction === 'LONG'
-    ? 'text-emerald-600 dark:text-emerald-400'
-    : 'text-rose-600 dark:text-rose-400'
 }
 
 function formatPnl(pnl: number | null) {
@@ -132,15 +127,6 @@ watch(entryId, loadEntry)
             <span class="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
               #{{ entry.no }}
             </span>
-            <span class="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
-              {{ entry.session }}
-            </span>
-            <span
-              class="rounded-full px-2.5 py-0.5 text-xs font-semibold"
-              :class="directionClass(entry.direction)"
-            >
-              {{ entry.direction }}
-            </span>
             <span class="text-xs text-zinc-400">{{ isoToDisplay(entry.date) }}</span>
           </div>
 
@@ -166,13 +152,20 @@ watch(entryId, loadEntry)
         </header>
 
         <section
-          v-if="entry.note.trim()"
+          v-if="entry.tags.length > 0"
           class="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
         >
-          <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">Note</h2>
-          <p class="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
-            {{ entry.note }}
-          </p>
+          <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">Tags</h2>
+          <div class="flex flex-wrap gap-1.5">
+            <span
+              v-for="(tag, i) in entry.tags"
+              :key="`${tag}-${i}`"
+              class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium uppercase tracking-wide"
+              :class="getTagClass(tag)"
+            >
+              {{ tag }}
+            </span>
+          </div>
         </section>
 
         <section v-if="entry.images.length > 0" class="space-y-4">

@@ -22,6 +22,7 @@ const {
   resetToCurrentWeek,
   resetToCurrentMonth,
   pairSuggestions,
+  tagSuggestions,
   loading,
   error,
   totalPnl,
@@ -166,6 +167,7 @@ const readonly = computed(() => !isAuthenticated.value)
         <JournalTable
           :entries="visibleEntries"
           :pair-suggestions="pairSuggestions"
+          :tag-suggestions="tagSuggestions"
           :sort-field="sortField"
           :sort-direction="sortDirection"
           :has-any-entries="entries.length > 0"

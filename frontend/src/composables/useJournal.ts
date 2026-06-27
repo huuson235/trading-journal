@@ -9,6 +9,7 @@ import { useAuth } from '@/composables/useAuth'
 
 const entries = ref<JournalEntry[]>([])
 const pairSuggestions = ref<string[]>([])
+const tagSuggestions = ref<string[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 
@@ -41,6 +42,7 @@ function queueSave(entry: JournalEntry) {
           images: updated.images,
         }
         await refreshPairs()
+        await refreshTags()
       } catch (e) {
         error.value = e instanceof Error ? e.message : 'Lỗi lưu dữ liệu'
       } finally {
@@ -56,6 +58,14 @@ const debouncedQueueAll = debounce(() => {
 
 watch(entries, debouncedQueueAll, { deep: true })
 
+async function refreshTags() {
+  try {
+    tagSuggestions.value = await journalApi.fetchTags()
+  } catch {
+    /* ignore */
+  }
+}
+
 async function refreshPairs() {
   try {
     pairSuggestions.value = await journalApi.fetchPairs()
@@ -69,12 +79,14 @@ async function loadEntries() {
   error.value = null
   skipSave = true
   try {
-    const [data, pairs] = await Promise.all([
+    const [data, pairs, tags] = await Promise.all([
       journalApi.fetchEntries(),
       journalApi.fetchPairs(),
+      journalApi.fetchTags(),
     ])
     entries.value = data
     pairSuggestions.value = pairs
+    tagSuggestions.value = tags
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Không tải được dữ liệu'
   } finally {
@@ -131,6 +143,11 @@ export function useJournal() {
     dateTo.value = range.to
   }
 
+  const allTagSuggestions = computed(() => {
+    const fromEntries = entries.value.flatMap((e) => e.tags.map((t) => t.trim().toUpperCase()))
+    return [...new Set([...tagSuggestions.value, ...fromEntries])]
+  })
+
   const allPairSuggestions = computed(() => {
     const fromEntries = entries.value
       .map((e) => e.pair.trim().toUpperCase())
@@ -144,6 +161,7 @@ export function useJournal() {
       const entry = await journalApi.createEntry()
       entries.value.unshift(entry)
       await refreshPairs()
+      await refreshTags()
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Không thêm được dòng'
     }
@@ -172,6 +190,7 @@ export function useJournal() {
       await journalApi.deleteEntry(id)
       entries.value = entries.value.filter((e) => e.id !== id)
       await refreshPairs()
+      await refreshTags()
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Không xóa được dòng'
     }
@@ -203,6 +222,7 @@ export function useJournal() {
     resetToCurrentWeek,
     resetToCurrentMonth,
     pairSuggestions: allPairSuggestions,
+    tagSuggestions: allTagSuggestions,
     loading,
     error,
     totalPnl,

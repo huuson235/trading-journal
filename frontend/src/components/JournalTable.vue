@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
 import type { JournalEntry, SortDirection, SortField } from '@/types/journal'
-import { DIRECTIONS, SESSIONS } from '@/types/journal'
 import ImagesCell from './ImagesCell.vue'
 import PairInput from './PairInput.vue'
+import TagsInput from './TagsInput.vue'
 import DateInput from './DateInput.vue'
 
 defineProps<{
   entries: JournalEntry[]
   pairSuggestions: string[]
+  tagSuggestions: string[]
   sortField: SortField
   sortDirection: SortDirection
   hasAnyEntries: boolean
@@ -24,12 +25,6 @@ const emit = defineEmits<{
 
 const cellInput =
   'w-full min-w-0 rounded border-0 bg-transparent px-1 py-1 text-[11px] sm:text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400/50 dark:focus:ring-indigo-500/50'
-
-const cellTextarea =
-  cellInput +
-  ' resize-none leading-snug break-words whitespace-pre-wrap [field-sizing:content] min-h-[1.5rem]'
-
-const cellSelect = cellInput + ' cursor-pointer'
 
 const mobileInput =
   'w-full rounded border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-800'
@@ -75,12 +70,6 @@ function mobileCardClass(pnl: number | null) {
   return 'border-rose-300 bg-rose-100 dark:border-rose-800 dark:bg-rose-950/50'
 }
 
-function directionClass(direction: string) {
-  return direction === 'LONG'
-    ? 'text-emerald-600 dark:text-emerald-400'
-    : 'text-rose-600 dark:text-rose-400'
-}
-
 function sortMark(field: SortField, active: SortField, dir: SortDirection) {
   if (field !== active) return ''
   return dir === 'asc' ? '↑' : '↓'
@@ -97,7 +86,7 @@ function thClass(field: SortField, active: SortField) {
       class="hidden overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 md:block"
     >
       <div class="overflow-x-auto">
-        <table class="w-full min-w-[952px] border-collapse text-left">
+        <table class="w-full min-w-[792px] border-collapse text-left">
           <thead>
             <tr class="border-b border-zinc-200 bg-zinc-50 text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-400">
               <th class="sticky left-0 z-20 w-9 bg-zinc-50 px-1.5 py-1.5 dark:bg-zinc-900/80">No.</th>
@@ -106,19 +95,9 @@ function thClass(field: SortField, active: SortField) {
                   Date <span class="text-[9px]">{{ sortMark('date', sortField, sortDirection) }}</span>
                 </button>
               </th>
-              <th class="w-[80px] px-1.5 py-1.5">
-                <button type="button" :class="[sortableTh, thClass('session', sortField)]" @click="emit('sort', 'session')">
-                  Session <span class="text-[9px]">{{ sortMark('session', sortField, sortDirection) }}</span>
-                </button>
-              </th>
               <th class="w-[76px] px-1.5 py-1.5">
                 <button type="button" :class="[sortableTh, thClass('pair', sortField)]" @click="emit('sort', 'pair')">
                   Pair <span class="text-[9px]">{{ sortMark('pair', sortField, sortDirection) }}</span>
-                </button>
-              </th>
-              <th class="w-[80px] px-1.5 py-1.5">
-                <button type="button" :class="[sortableTh, thClass('direction', sortField)]" @click="emit('sort', 'direction')">
-                  Dir <span class="text-[9px]">{{ sortMark('direction', sortField, sortDirection) }}</span>
                 </button>
               </th>
               <th class="w-10 px-1.5 py-1.5 text-right">
@@ -131,7 +110,7 @@ function thClass(field: SortField, active: SortField) {
                   PnL <span class="text-[9px]">{{ sortMark('pnl', sortField, sortDirection) }}</span>
                 </button>
               </th>
-              <th class="min-w-[160px] px-1.5 py-2">Note</th>
+              <th class="min-w-[180px] px-1.5 py-2">Tags</th>
               <th class="min-w-[180px] w-[180px] px-1.5 py-2">Images</th>
               <th class="w-[72px] px-0.5 py-1.5" />
             </tr>
@@ -149,11 +128,6 @@ function thClass(field: SortField, active: SortField) {
               <td :class="['sticky left-9 z-10 min-w-[104px] whitespace-nowrap px-0.5 py-1', stickyCellClass(entry.pnl)]">
                 <DateInput v-model="entry.date" :input-class="cellInput" :readonly="readonly" />
               </td>
-              <td class="whitespace-nowrap px-0.5 py-1">
-                <select v-model="entry.session" :class="cellSelect" :disabled="readonly">
-                  <option v-for="s in SESSIONS" :key="s" :value="s">{{ s }}</option>
-                </select>
-              </td>
               <td class="min-w-[76px] whitespace-nowrap px-0.5 py-1">
                 <PairInput
                   v-model="entry.pair"
@@ -162,15 +136,6 @@ function thClass(field: SortField, active: SortField) {
                   placeholder="—"
                   :readonly="readonly"
                 />
-              </td>
-              <td class="min-w-[80px] whitespace-nowrap px-0.5 py-1">
-                <select
-                  v-model="entry.direction"
-                  :class="[cellSelect, 'font-medium', directionClass(entry.direction)]"
-                  :disabled="readonly"
-                >
-                  <option v-for="d in DIRECTIONS" :key="d" :value="d">{{ d }}</option>
-                </select>
               </td>
               <td class="whitespace-nowrap px-0.5 py-1">
                 <input
@@ -192,13 +157,11 @@ function thClass(field: SortField, active: SortField) {
                   :class="[cellInput, 'no-spinner text-right font-medium', pnlClass(entry.pnl)]"
                 />
               </td>
-              <td class="min-w-[160px] max-w-[200px] align-middle px-0.5 py-1">
-                <textarea
-                  v-model="entry.note"
-                  rows="1"
-                  placeholder="—"
+              <td class="min-w-[180px] max-w-[240px] align-middle px-0.5 py-1">
+                <TagsInput
+                  v-model="entry.tags"
+                  :suggestions="tagSuggestions"
                   :readonly="readonly"
-                  :class="cellTextarea"
                 />
               </td>
               <td class="min-w-[180px] w-[180px] align-middle px-0.5 py-1">
@@ -339,12 +302,6 @@ function thClass(field: SortField, active: SortField) {
 
         <div class="mb-2 grid grid-cols-2 gap-2">
           <div>
-            <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">Session</label>
-            <select v-model="entry.session" :class="mobileInput" :disabled="readonly">
-              <option v-for="s in SESSIONS" :key="s" :value="s">{{ s }}</option>
-            </select>
-          </div>
-          <div>
             <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">Pair</label>
             <PairInput
               v-model="entry.pair"
@@ -352,16 +309,6 @@ function thClass(field: SortField, active: SortField) {
               :input-class="mobileInput + ' uppercase'"
               :readonly="readonly"
             />
-          </div>
-          <div>
-            <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">Direction</label>
-            <select
-              v-model="entry.direction"
-              :class="[mobileInput, 'font-medium', directionClass(entry.direction)]"
-              :disabled="readonly"
-            >
-              <option v-for="d in DIRECTIONS" :key="d" :value="d">{{ d }}</option>
-            </select>
           </div>
           <div>
             <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">R:R</label>
@@ -381,13 +328,11 @@ function thClass(field: SortField, active: SortField) {
         </div>
 
         <div class="mb-2">
-          <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">Note</label>
-          <textarea
-            v-model="entry.note"
-            rows="2"
-            placeholder="Ghi chú giao dịch..."
+          <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">Tags</label>
+          <TagsInput
+            v-model="entry.tags"
+            :suggestions="tagSuggestions"
             :readonly="readonly"
-            class="w-full resize-none rounded border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs leading-snug break-words whitespace-pre-wrap dark:border-zinc-700 dark:bg-zinc-800"
           />
         </div>
 

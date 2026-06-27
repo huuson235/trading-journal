@@ -1,5 +1,4 @@
 import type { JournalEntry, SortDirection, SortField } from '@/types/journal'
-import { SESSIONS } from '@/types/journal'
 import { isIsoInRange } from '@/utils/date'
 
 export function filterEntriesByDate(
@@ -42,12 +41,6 @@ export function sortEntries(
         break
       case 'pair':
         cmp = a.pair.localeCompare(b.pair, undefined, { sensitivity: 'base' })
-        break
-      case 'session':
-        cmp = SESSIONS.indexOf(a.session) - SESSIONS.indexOf(b.session)
-        break
-      case 'direction':
-        cmp = a.direction.localeCompare(b.direction)
         break
       case 'result':
         cmp = resultOrder(a.pnl) - resultOrder(b.pnl)

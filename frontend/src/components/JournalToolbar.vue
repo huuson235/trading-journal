@@ -24,9 +24,7 @@ const filterInput =
 
 const sortFields: { key: SortField; label: string }[] = [
   { key: 'date', label: 'Date' },
-  { key: 'session', label: 'Session' },
   { key: 'pair', label: 'Pair' },
-  { key: 'direction', label: 'Dir' },
   { key: 'rr', label: 'R:R' },
   { key: 'pnl', label: 'PnL' },
   { key: 'result', label: 'Kết quả' },

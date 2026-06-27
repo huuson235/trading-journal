@@ -13,6 +13,10 @@ export function fetchPairs() {
   return request<string[]>('/api/pairs')
 }
 
+export function fetchTags() {
+  return request<string[]>('/api/tags')
+}
+
 export function createEntry(data?: Partial<JournalEntry>) {
   return request<JournalEntry>('/api/entries', {
     method: 'POST',
@@ -30,7 +34,7 @@ export function updateEntry(id: number, entry: JournalEntry) {
       direction: entry.direction,
       rr: entry.rr,
       pnl: entry.pnl,
-      note: entry.note,
+      tags: entry.tags,
       visible: entry.visible,
     }),
   })

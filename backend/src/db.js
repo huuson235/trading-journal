@@ -55,6 +55,34 @@ db.exec(`
   )
 `)
 
+function normalizeTag(value) {
+  return String(value ?? '').trim().toUpperCase()
+}
+
+function parseTagsFromNote(noteValue) {
+  if (!noteValue) return []
+  const trimmed = String(noteValue).trim()
+  if (!trimmed) return []
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (Array.isArray(parsed)) {
+        return parsed.map(normalizeTag).filter(Boolean)
+      }
+    } catch {
+      /* legacy plain text */
+    }
+  }
+  return [normalizeTag(trimmed)]
+}
+
+function serializeTags(tags) {
+  const normalized = (Array.isArray(tags) ? tags : [])
+    .map(normalizeTag)
+    .filter(Boolean)
+  return JSON.stringify(normalized)
+}
+
 function migrate() {
   const cols = db.prepare('PRAGMA table_info(journal_entries)').all().map((c) => c.name)
   if (!cols.includes('direction')) {
@@ -86,6 +114,44 @@ function migrate() {
     }
     db.prepare(`
       INSERT INTO settings (key, value) VALUES ('images_migrated', '1')
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run()
+  }
+
+  const notesMigrated = db.prepare("SELECT value FROM settings WHERE key = 'notes_migrated_tags'").get()
+  if (!notesMigrated) {
+    const rows = db.prepare('SELECT id, note FROM journal_entries').all()
+    const update = db.prepare('UPDATE journal_entries SET note = ? WHERE id = ?')
+    for (const row of rows) {
+      const trimmed = String(row.note ?? '').trim()
+      if (!trimmed || trimmed.startsWith('[')) continue
+      update.run(serializeTags(parseTagsFromNote(row.note)), row.id)
+    }
+    db.prepare(`
+      INSERT INTO settings (key, value) VALUES ('notes_migrated_tags', '1')
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run()
+  }
+
+  const sessionMigrated = db.prepare("SELECT value FROM settings WHERE key = 'session_migrated_tags'").get()
+  if (!sessionMigrated) {
+    const SESSION_TO_TAG = {
+      Asia: 'ASIA',
+      London: 'LO',
+      NYA: 'NYA',
+      NYL: 'NYL',
+      NYP: 'NYP',
+    }
+    const rows = db.prepare('SELECT id, session, note FROM journal_entries').all()
+    const update = db.prepare('UPDATE journal_entries SET note = ? WHERE id = ?')
+    for (const row of rows) {
+      const tag = SESSION_TO_TAG[row.session] ?? 'ASIA'
+      const tags = parseTagsFromNote(row.note)
+      if (tags.includes(tag)) continue
+      update.run(serializeTags([...tags, tag]), row.id)
+    }
+    db.prepare(`
+      INSERT INTO settings (key, value) VALUES ('session_migrated_tags', '1')
       ON CONFLICT(key) DO UPDATE SET value = excluded.value
     `).run()
   }
@@ -130,7 +196,7 @@ export function rowToEntry(row) {
     direction: normalizeDirection(row.direction),
     rr: normalizeNumber(row.rr),
     pnl: normalizeNumber(row.pnl),
-    note: row.note,
+    tags: parseTagsFromNote(row.note),
     visible: Boolean(row.visible ?? 1),
     images: loadImages(row.id),
   }
@@ -187,15 +253,18 @@ export function createEntry(data) {
     normalizeDirection(data.direction),
     normalizeNumber(data.rr),
     normalizeNumber(data.pnl),
-    data.note ?? '',
+    serializeTags(data.tags ?? []),
     data.visible === false ? 0 : 1,
   )
   return getEntryById(Number(result.lastInsertRowid))
 }
 
 export function updateEntry(id, data) {
-  const existing = db.prepare('SELECT id FROM journal_entries WHERE id = ?').get(id)
+  const existing = db.prepare('SELECT id, note FROM journal_entries WHERE id = ?').get(id)
   if (!existing) return null
+
+  const noteValue =
+    data.tags !== undefined ? serializeTags(data.tags) : existing.note ?? '[]'
 
   const stmt = db.prepare(`
     UPDATE journal_entries SET
@@ -210,7 +279,7 @@ export function updateEntry(id, data) {
     normalizeDirection(data.direction),
     normalizeNumber(data.rr),
     normalizeNumber(data.pnl),
-    data.note ?? '',
+    noteValue,
     data.visible === false ? 0 : 1,
     id,
   )
@@ -257,6 +326,19 @@ export function removeEntryImageById(entryId, imageId) {
   removeImageFiles(UPLOADS_DIR, img.filename)
   db.prepare('DELETE FROM entry_images WHERE id = ?').run(imageId)
   return getEntryById(entryId)
+}
+
+export function getDistinctTags() {
+  const rows = db
+    .prepare(`SELECT note FROM journal_entries WHERE note IS NOT NULL AND TRIM(note) != ''`)
+    .all()
+  const set = new Set()
+  for (const row of rows) {
+    for (const tag of parseTagsFromNote(row.note)) {
+      set.add(tag)
+    }
+  }
+  return [...set].sort()
 }
 
 export function getDistinctPairs() {

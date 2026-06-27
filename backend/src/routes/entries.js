@@ -10,6 +10,7 @@ import {
   deleteEntry,
   getAllEntries,
   getDistinctPairs,
+  getDistinctTags,
   getEntryById,
   removeEntryImageById,
   updateEntry,
@@ -58,6 +59,10 @@ router.get('/pairs', (_req, res) => {
   res.json(getDistinctPairs())
 })
 
+router.get('/tags', (_req, res) => {
+  res.json(getDistinctTags())
+})
+
 router.post('/entries', requireAuth, (req, res) => {
   const today = new Date().toISOString().slice(0, 10)
   const entry = createEntry({
@@ -67,7 +72,7 @@ router.post('/entries', requireAuth, (req, res) => {
     direction: req.body.direction ?? 'LONG',
     rr: req.body.rr ?? null,
     pnl: req.body.pnl ?? null,
-    note: req.body.note ?? '',
+    tags: req.body.tags ?? [],
     visible: req.body.visible !== false,
   })
   res.status(201).json(entry)
@@ -85,7 +90,7 @@ router.patch('/entries/:id', requireAuth, (req, res) => {
     direction: req.body.direction ?? existing.direction,
     rr: req.body.rr !== undefined ? req.body.rr : existing.rr,
     pnl: req.body.pnl !== undefined ? req.body.pnl : existing.pnl,
-    note: req.body.note ?? existing.note,
+    tags: req.body.tags ?? existing.tags,
     visible: req.body.visible !== undefined ? req.body.visible : existing.visible,
   })
   res.json(entry)
