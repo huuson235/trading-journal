@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue'
+import { ref, watch, type MaybeRefOrGetter, toValue } from 'vue'
 import * as backgroundApi from '@/api/background'
 import { getAuthToken } from '@/api/client'
 import { useTheme } from '@/composables/useTheme'
@@ -11,35 +11,24 @@ import {
 } from '@/types/background'
 import { applyBackgroundToDocument, getCurrentTheme } from '@/utils/backgroundCss'
 
-const STORAGE_KEY = 'background'
-
 const settings = ref<BackgroundSettings>({ ...DEFAULT_BACKGROUND })
 const loading = ref(false)
 const saving = ref(false)
-let initialized = false
+let activeSlug: string | null = null
 
-function persistLocal(value: BackgroundSettings) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(value))
+function persistLocal(slug: string, value: BackgroundSettings) {
+  localStorage.setItem(`background:${slug}`, JSON.stringify(value))
 }
 
 function apply(value: BackgroundSettings) {
   applyBackgroundToDocument(value, getCurrentTheme())
 }
 
-async function syncToServer(value: BackgroundSettings) {
-  if (!getAuthToken()) return value
-  try {
-    return await backgroundApi.updateBackground(value)
-  } catch {
-    return value
-  }
-}
+export async function loadBackgroundForSlug(slug: string) {
+  activeSlug = slug
+  loading.value = true
 
-export async function initBackground() {
-  if (initialized) return
-  initialized = true
-
-  const cached = localStorage.getItem(STORAGE_KEY)
+  const cached = localStorage.getItem(`background:${slug}`)
   if (cached) {
     try {
       settings.value = JSON.parse(cached) as BackgroundSettings
@@ -47,20 +36,22 @@ export async function initBackground() {
     } catch {
       /* ignore */
     }
+  } else {
+    settings.value = { ...DEFAULT_BACKGROUND }
+    apply(settings.value)
   }
 
-  loading.value = true
   try {
-    const remote = await backgroundApi.fetchBackground()
-    const cached = settings.value
+    const remote = await backgroundApi.fetchBackground(slug)
+    const local = settings.value
     if (remote.type !== 'default') {
       settings.value = remote
-    } else if (cached.type !== 'default') {
-      settings.value = cached
+    } else if (local.type !== 'default') {
+      settings.value = local
     } else {
       settings.value = remote
     }
-    persistLocal(settings.value)
+    persistLocal(slug, settings.value)
     apply(settings.value)
   } catch {
     /* offline — keep cache */
@@ -69,20 +60,51 @@ export async function initBackground() {
   }
 }
 
-export function useBackground() {
+export function resetBackgroundToDefault() {
+  activeSlug = null
+  settings.value = { ...DEFAULT_BACKGROUND }
+  apply(settings.value)
+}
+
+/** Gọi 1 lần khi boot — áp dụng default trước khi vào journal */
+export async function initBackground() {
+  apply(settings.value)
+}
+
+export function useBackground(slugSource?: MaybeRefOrGetter<string | null | undefined>) {
   const { theme } = useTheme()
 
   watch(theme, () => apply(settings.value))
+
+  if (slugSource) {
+    watch(
+      () => toValue(slugSource),
+      (slug) => {
+        if (slug) void loadBackgroundForSlug(slug)
+        else resetBackgroundToDefault()
+      },
+      { immediate: true },
+    )
+  }
+
+  async function syncToServer(value: BackgroundSettings) {
+    if (!getAuthToken() || !activeSlug) return value
+    try {
+      return await backgroundApi.updateBackground(activeSlug, value)
+    } catch {
+      return value
+    }
+  }
 
   async function save(next: BackgroundSettings) {
     saving.value = true
     try {
       settings.value = next
       apply(next)
-      persistLocal(next)
+      if (activeSlug) persistLocal(activeSlug, next)
       const synced = await syncToServer(next)
       settings.value = synced
-      persistLocal(synced)
+      if (activeSlug) persistLocal(activeSlug, synced)
       apply(synced)
     } finally {
       saving.value = false
@@ -156,17 +178,18 @@ export function useBackground() {
   }
 
   async function uploadImage(file: File, fit?: BackgroundFit, overlay?: number) {
-    if (!getAuthToken()) throw new Error('Đăng nhập để upload ảnh nền')
+    if (!getAuthToken() || !activeSlug) throw new Error('Đăng nhập để upload ảnh nền')
     saving.value = true
     try {
       const result = await backgroundApi.uploadBackgroundImage(
+        activeSlug,
         file,
         fit ?? settings.value.fit ?? 'cover',
         overlay ?? settings.value.overlay ?? 0,
       )
       settings.value = result
       apply(result)
-      persistLocal(result)
+      persistLocal(activeSlug, result)
       return result
     } finally {
       saving.value = false

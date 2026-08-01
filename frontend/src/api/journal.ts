@@ -1,31 +1,35 @@
 import { request } from './client'
 import type { Direction, JournalEntry, Session } from '@/types/journal'
 
-export function fetchEntries() {
-  return request<JournalEntry[]>('/api/entries')
+function base(slug: string) {
+  return `/api/u/${encodeURIComponent(slug)}`
 }
 
-export function fetchEntry(id: number) {
-  return request<JournalEntry>(`/api/entries/${id}`)
+export function fetchEntries(slug: string) {
+  return request<JournalEntry[]>(`${base(slug)}/entries`)
 }
 
-export function fetchPairs() {
-  return request<string[]>('/api/pairs')
+export function fetchEntry(slug: string, id: number) {
+  return request<JournalEntry>(`${base(slug)}/entries/${id}`)
 }
 
-export function fetchTags() {
-  return request<string[]>('/api/tags')
+export function fetchPairs(slug: string) {
+  return request<string[]>(`${base(slug)}/pairs`)
 }
 
-export function createEntry(data?: Partial<JournalEntry>) {
-  return request<JournalEntry>('/api/entries', {
+export function fetchTags(slug: string) {
+  return request<string[]>(`${base(slug)}/tags`)
+}
+
+export function createEntry(slug: string, data?: Partial<JournalEntry>) {
+  return request<JournalEntry>(`${base(slug)}/entries`, {
     method: 'POST',
     body: JSON.stringify(data ?? {}),
   })
 }
 
-export function updateEntry(id: number, entry: JournalEntry) {
-  return request<JournalEntry>(`/api/entries/${id}`, {
+export function updateEntry(slug: string, id: number, entry: JournalEntry) {
+  return request<JournalEntry>(`${base(slug)}/entries/${id}`, {
     method: 'PATCH',
     body: JSON.stringify({
       date: entry.date,
@@ -40,21 +44,21 @@ export function updateEntry(id: number, entry: JournalEntry) {
   })
 }
 
-export function deleteEntry(id: number) {
-  return request<void>(`/api/entries/${id}`, { method: 'DELETE' })
+export function deleteEntry(slug: string, id: number) {
+  return request<void>(`${base(slug)}/entries/${id}`, { method: 'DELETE' })
 }
 
-export function uploadImage(id: number, file: File) {
+export function uploadImage(slug: string, id: number, file: File) {
   const form = new FormData()
   form.append('image', file)
-  return request<JournalEntry>(`/api/entries/${id}/images`, {
+  return request<JournalEntry>(`${base(slug)}/entries/${id}/images`, {
     method: 'POST',
     body: form,
   })
 }
 
-export function deleteImage(id: number, imageId: number) {
-  return request<JournalEntry>(`/api/entries/${id}/images/${imageId}`, {
+export function deleteImage(slug: string, id: number, imageId: number) {
+  return request<JournalEntry>(`${base(slug)}/entries/${id}/images/${imageId}`, {
     method: 'DELETE',
   })
 }

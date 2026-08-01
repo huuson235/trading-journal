@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 
 const open = defineModel<boolean>('open', { default: false })
 
+const router = useRouter()
 const { login } = useAuth()
 
 const formUser = ref('')
@@ -15,9 +17,16 @@ async function onSubmit() {
   error.value = null
   loading.value = true
   try {
-    await login(formUser.value.trim(), formPass.value)
+    const result = await login(formUser.value.trim(), formPass.value)
     formPass.value = ''
     open.value = false
+    if (result.role === 'root') {
+      await router.push({ name: 'admin' })
+    } else if (result.slug) {
+      await router.push({ name: 'journal', params: { slug: result.slug } })
+    } else {
+      await router.push({ name: 'home' })
+    }
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Đăng nhập thất bại'
   } finally {
@@ -43,7 +52,9 @@ function onClose() {
         @submit.prevent="onSubmit"
       >
         <h2 class="mb-1 text-base font-semibold">Đăng nhập</h2>
-        <p class="mb-4 text-xs text-zinc-500">Đăng nhập để chỉnh sửa nhật ký giao dịch</p>
+        <p class="mb-4 text-xs text-zinc-500">
+          Account thường → journal của bạn. Root → quản lý accounts.
+        </p>
 
         <div class="mb-3">
           <label class="mb-1 block text-xs font-medium text-zinc-500">Username</label>

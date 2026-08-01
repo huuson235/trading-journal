@@ -13,6 +13,7 @@ defineProps<{
   sortField: SortField
   sortDirection: SortDirection
   hasAnyEntries: boolean
+  slug: string
   readonly?: boolean
   uploadHandler?: (entryId: number, file: File) => Promise<void>
   removeImageHandler?: (entryId: number, imageId: number) => Promise<void>
@@ -200,7 +201,7 @@ function thClass(field: SortField, active: SortField) {
                   </button>
                   <RouterLink
                     v-if="entry.visible"
-                    :to="{ name: 'entry-detail', params: { id: entry.id } }"
+                    :to="{ name: 'entry-detail', params: { slug, id: entry.id } }"
                     target="_blank"
                     :class="[actionBtn, 'opacity-70 group-hover:opacity-100']"
                     title="Xem & chia sẻ"
@@ -277,7 +278,7 @@ function thClass(field: SortField, active: SortField) {
             </button>
             <RouterLink
               v-if="entry.visible"
-              :to="{ name: 'entry-detail', params: { id: entry.id } }"
+              :to="{ name: 'entry-detail', params: { slug, id: entry.id } }"
               target="_blank"
               :class="[actionBtn, 'p-1']"
               title="Xem & chia sẻ"

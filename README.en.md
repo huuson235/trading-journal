@@ -2,7 +2,7 @@
 
 [English](README.en.md) · [Tiếng Việt](README.md)
 
-Personal trading journal — log trades, upload chart images, filter/sort by date, and customize the UI.
+Multi-account trading journal — each account has its own database; root admin is configured via `.env`.
 
 ![Trading Journal dashboard](docs/screenshot.png)
 
@@ -13,24 +13,21 @@ Personal trading journal — log trades, upload chart images, filter/sort by dat
 | Frontend | Vue 3, TypeScript, Vue Router, Tailwind CSS v4, Vite |
 | Backend | Node.js, Express 5, SQLite (`node:sqlite`) |
 | Images | Multer (upload), Sharp (WebP thumbnails) |
-| Auth | Bearer token, credentials in `.env` |
+| Auth | Bearer token; root in `.env`, user accounts in `accounts.db` |
 
 ## Features
 
+### Multi-account
+- **Root** (`.env`): manage accounts at `/admin`
+- Each account has its own SQLite DB + uploads under `users/<slug>/`
+- Public journal at `/u/:slug`; account login edits that journal
+
 ### Trading journal
-- Compact table: No., Date, Session, Pair, R:R, PnL, Note, HTF/MTF/LTF
-- Inline edit with auto-save (500ms debounce)
-- Paste / upload chart images (Ctrl+V), full-size view via lightbox
-- ~320px WebP thumbnails in the table; full image loads on click
-- Pair suggestions from the database
-- Date range filter with **This week** / **This month** shortcuts
-- Sort by: Date (`created_at`), Session, Pair, R:R, PnL
-- Expand images globally or per row
+- Table: Date, Pair, R:R, PnL, Tags, Images
+- Tags, auto-save, chart paste/upload, date filter & sort
 
 ### Authentication
-- Not logged in: view-only (read-only)
-- Logged in: add/edit/delete entries, upload images
-- Token stored in `sessionStorage` (cleared when the tab closes)
+- Guest: read-only; User: own journal; Root: account admin
 
 ### UI
 - Dark / light mode (saved in `localStorage`)

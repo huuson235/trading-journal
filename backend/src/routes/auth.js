@@ -1,32 +1,51 @@
 import { Router } from 'express'
 import {
-  createToken,
-  getAuthenticatedUsername,
-  revokeToken,
+  authenticate,
+  createSession,
+  getRequestToken,
   requireAuth,
-  validateCredentials,
+  revokeToken,
 } from '../auth.js'
+import { listAccounts } from '../accounts.js'
 
 const router = Router()
 
 router.post('/login', (req, res) => {
   const { username, password } = req.body ?? {}
-  if (!validateCredentials(username, password)) {
+  const session = authenticate(username, password)
+  if (!session) {
     return res.status(401).json({ error: 'Sai username hoặc password' })
   }
-  const token = createToken()
-  res.json({ token, username: getAuthenticatedUsername() })
+  const token = createSession(session)
+  res.json({
+    token,
+    username: session.username,
+    role: session.role,
+    slug: session.slug ?? null,
+  })
 })
 
 router.post('/logout', (req, res) => {
-  const header = req.headers.authorization
-  const token = header?.startsWith('Bearer ') ? header.slice(7) : null
-  revokeToken(token)
+  revokeToken(getRequestToken(req))
   res.status(204).end()
 })
 
-router.get('/me', requireAuth, (_req, res) => {
-  res.json({ username: getAuthenticatedUsername() })
+router.get('/me', requireAuth, (req, res) => {
+  const session = req.session
+  res.json({
+    username: session.username,
+    role: session.role,
+    slug: session.slug ?? null,
+  })
+})
+
+/** Danh sách account public (để chọn journal xem) */
+router.get('/accounts', (_req, res) => {
+  const accounts = listAccounts({ activeOnly: true }).map((a) => ({
+    username: a.username,
+    slug: a.slug,
+  }))
+  res.json(accounts)
 })
 
 export default router

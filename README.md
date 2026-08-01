@@ -2,7 +2,7 @@
 
 [Tiếng Việt](README.md) · [English](README.en.md)
 
-Ứng dụng nhật ký giao dịch cá nhân — ghi chép trade, upload ảnh chart, lọc/sắp xếp theo ngày, và tùy chỉnh giao diện.
+Ứng dụng nhật ký giao dịch đa tài khoản — mỗi account một database riêng, quản lý bởi root từ `.env`.
 
 ![Trading Journal dashboard](docs/screenshot.png)
 
@@ -13,29 +13,31 @@
 | Frontend | Vue 3, TypeScript, Vue Router, Tailwind CSS v4, Vite |
 | Backend | Node.js, Express 5, SQLite (`node:sqlite`) |
 | Ảnh | Multer (upload), Sharp (thumbnail WebP) |
-| Auth | Bearer token, credentials trong `.env` |
+| Auth | Bearer token; root trong `.env`, user accounts trong `accounts.db` |
 
 ## Tính năng
 
+### Đa tài khoản
+- **Root** (`AUTH_USERNAME` / `AUTH_PASSWORD` trong `.env`): trang `/admin` tạo/sửa/xóa/vô hiệu account
+- Mỗi **account** có SQLite + uploads riêng (`data/users/<slug>/`, `uploads/users/<slug>/`)
+- Journal public tại `/u/:slug` (guest chỉ xem entry `visible`)
+- Đăng nhập account → chỉnh journal của mình
+
 ### Nhật ký giao dịch
-- Bảng compact: No., Date, Session, Pair, R:R, PnL, Note, HTF/MTF/LTF
+- Bảng: Date, Pair, R:R, PnL, Tags, Images
+- Tags (IN HOA): autocomplete, kéo thả, style đặc biệt (TP/SL/BE, session, bias…)
 - Inline edit, auto-save (debounce 500ms)
-- Paste / upload ảnh chart (Ctrl+V), xem full qua lightbox
-- Thumbnail WebP ~320px trong bảng, click mới load ảnh gốc
-- Gợi ý pair từ database
-- Lọc theo khoảng ngày, nút **Tuần này** / **Tháng này**
-- Sort: Date (theo `created_at`), Session, Pair, R:R, PnL
-- Expand ảnh toàn cục hoặc từng dòng
+- Paste / upload ảnh chart (Ctrl+V), lightbox
+- Lọc theo khoảng ngày, sort Date / Pair / R:R / PnL / Kết quả
 
 ### Xác thực
-- Chưa đăng nhập: chỉ xem (read-only)
-- Đăng nhập: thêm/sửa/xóa entry, upload ảnh
-- Token lưu trong `sessionStorage` (mất khi đóng tab)
+- Guest: chỉ xem journal công khai
+- User: sửa journal của mình
+- Root: quản lý accounts (+ có thể sửa mọi journal)
 
 ### Giao diện
-- Dark / light mode (lưu `localStorage`)
-- Tùy chỉnh nền trang: màu solid, pattern, hoặc upload ảnh
-- Cài đặt nền lưu server + `localStorage` (ảnh nền cần đăng nhập)
+- Dark / light mode
+- Nền trang theo từng journal (solid / pattern / ảnh)
 
 ## Cấu trúc thư mục
 
@@ -43,16 +45,18 @@
 journal/
 ├── frontend/          # Vue SPA (dev :5173)
 ├── backend/           # Express API + serve static production
-│   ├── src/           # server, routes, db, auth
-│   ├── data/          # journal.db (SQLite)
-│   ├── uploads/       # ảnh chart + ảnh nền
+│   ├── src/           # server, routes, db, accounts, auth
+│   ├── data/
+│   │   ├── accounts.db           # registry accounts
+│   │   └── users/<slug>/journal.db
+│   ├── uploads/users/<slug>/     # ảnh theo account
 │   ├── dist/          # frontend build (production)
-│   ├── ecosystem.config.cjs  # PM2 config
-│   └── .env           # AUTH_USERNAME, AUTH_PASSWORD
+│   ├── ecosystem.config.cjs
+│   └── .env           # AUTH_USERNAME, AUTH_PASSWORD (root)
 ├── scripts/
-│   └── build.sh       # build frontend → backend/dist
+│   └── build.sh
 ├── docs/
-│   └── screenshot.png # README screenshot
+│   └── screenshot.png
 ```
 
 ## Yêu cầu
@@ -78,9 +82,15 @@ Tạo file `backend/.env` (tham khảo `backend/.env.example`):
 ```env
 AUTH_USERNAME=admin
 AUTH_PASSWORD=your-password
+
+# Chỉ dùng khi migrate journal.db cũ lần đầu (mặc định main/main)
+# MIGRATE_ACCOUNT_USERNAME=main
+# MIGRATE_ACCOUNT_PASSWORD=main
 ```
 
 > File `.env` đã được gitignore — không commit credentials.
+>
+> Journal cũ `data/journal.db` sẽ tự chuyển sang account `main` khi server khởi động lần đầu sau update.
 
 ## Chạy development
 
@@ -129,33 +139,27 @@ Cấu hình mặc định: port `3001`, `NODE_ENV=production`.
 
 | Method | Endpoint | Auth | Mô tả |
 |--------|----------|------|-------|
-| `GET` | `/api/entries` | — | Danh sách entries |
-| `GET` | `/api/pairs` | — | Danh sách pair đã dùng |
-| `POST` | `/api/entries` | ✓ | Tạo entry |
-| `PATCH` | `/api/entries/:id` | ✓ | Cập nhật entry |
-| `DELETE` | `/api/entries/:id` | ✓ | Xóa entry |
-| `POST` | `/api/entries/:id/images/:slot` | ✓ | Upload ảnh (`htf`/`mtf`/`ltf`) |
-| `DELETE` | `/api/entries/:id/images/:slot` | ✓ | Xóa ảnh |
-| `POST` | `/api/auth/login` | — | Đăng nhập |
-| `POST` | `/api/auth/logout` | ✓ | Đăng xuất |
-| `GET` | `/api/auth/me` | ✓ | Kiểm tra session |
-| `GET` | `/api/settings/background` | — | Đọc cài đặt nền |
-| `PUT` | `/api/settings/background` | ✓ | Cập nhật nền |
-| `POST` | `/api/settings/background/image` | ✓ | Upload ảnh nền |
+| `POST` | `/api/auth/login` | — | Đăng nhập (root hoặc user) |
+| `POST` | `/api/auth/logout` | — | Đăng xuất |
+| `GET` | `/api/auth/me` | ✓ | Session hiện tại |
+| `GET` | `/api/auth/accounts` | — | Danh sách journal public |
+| `GET/POST/PATCH/DELETE` | `/api/admin/accounts` | root | Quản lý accounts |
+| `GET` | `/api/u/:slug/entries` | — | Entries của journal |
+| `POST/PATCH/DELETE` | `/api/u/:slug/entries…` | owner/root | Sửa journal |
+| `GET/PUT/POST` | `/api/u/:slug/settings/background` | xem / owner | Nền trang |
 
-Ảnh static: `/uploads/<filename>`
+Ảnh: `/uploads/:slug/<filename>`
 
 ## Dữ liệu
 
 | Dữ liệu | Vị trí |
 |---------|--------|
-| SQLite DB | `backend/data/journal.db` |
-| Ảnh chart / nền | `backend/uploads/` |
-| Theme, nền (cache) | `localStorage` (browser) |
-| Cài đặt nền (server) | bảng `settings` trong SQLite |
-| Auth token | `sessionStorage` (browser) |
+| Accounts registry | `backend/data/accounts.db` |
+| Journal DB | `backend/data/users/<slug>/journal.db` |
+| Ảnh | `backend/uploads/users/<slug>/` |
+| Root credentials | `backend/.env` |
 
-Backup: copy `backend/data/journal.db` và thư mục `backend/uploads/`.
+Backup: copy cả `backend/data/` và `backend/uploads/`.
 
 ## Scripts hữu ích
 

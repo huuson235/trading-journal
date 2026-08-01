@@ -1,19 +1,36 @@
 import { Router } from 'express'
 import multer from 'multer'
 import path from 'path'
-import { requireAuth } from '../auth.js'
+import { requireAccountWrite } from '../auth.js'
 import { removeBackgroundFile } from '../images.js'
-import {
-  DEFAULT_BACKGROUND,
-  UPLOADS_DIR,
-  getBackgroundSettings,
-  setBackgroundSettings,
-} from '../db.js'
+import { getAccountBySlug, isValidSlug } from '../accounts.js'
+import { DEFAULT_BACKGROUND, openJournalStore } from '../db.js'
 
-const router = Router()
+const router = Router({ mergeParams: true })
+
+function resolveStore(req, res) {
+  const slug = req.params.slug
+  if (!isValidSlug(slug)) {
+    res.status(400).json({ error: 'Slug không hợp lệ' })
+    return null
+  }
+  const account = getAccountBySlug(slug)
+  if (!account || !account.active) {
+    res.status(404).json({ error: 'Không tìm thấy journal' })
+    return null
+  }
+  return openJournalStore(slug)
+}
 
 const storage = multer.diskStorage({
-  destination: UPLOADS_DIR,
+  destination: (req, _file, cb) => {
+    try {
+      const store = openJournalStore(req.params.slug)
+      cb(null, store.uploadsDir)
+    } catch (err) {
+      cb(err)
+    }
+  },
   filename: (_req, file, cb) => {
     const ext = path.extname(file.originalname) || '.jpg'
     cb(null, `bg-${Date.now()}${ext}`)
@@ -35,7 +52,7 @@ function normalizeNumber(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback
 }
 
-function mergeBackground(body, current) {
+function mergeBackground(body, current, slug) {
   const type = body.type ?? current.type ?? 'default'
 
   if (type === 'default') return { ...DEFAULT_BACKGROUND }
@@ -59,7 +76,9 @@ function mergeBackground(body, current) {
 
   if (type === 'image') {
     const filename = body.filename ?? current.filename
-    const imageUrl = body.imageUrl ?? (filename ? `/uploads/${filename}` : current.imageUrl)
+    const imageUrl =
+      body.imageUrl ??
+      (filename ? `/uploads/${slug}/${filename}` : current.imageUrl)
     if (!imageUrl) return { ...DEFAULT_BACKGROUND }
     return {
       type: 'image',
@@ -73,44 +92,55 @@ function mergeBackground(body, current) {
   return { ...DEFAULT_BACKGROUND }
 }
 
-function clearBackgroundImage(settings) {
+function clearBackgroundImage(store, settings) {
   if (settings.type === 'image' && settings.filename) {
-    removeBackgroundFile(UPLOADS_DIR, settings.filename)
+    removeBackgroundFile(store.uploadsDir, settings.filename)
   }
 }
 
-router.get('/settings/background', (_req, res) => {
-  res.json(getBackgroundSettings())
+router.get('/settings/background', (req, res) => {
+  const store = resolveStore(req, res)
+  if (!store) return
+  res.json(store.getBackgroundSettings())
 })
 
-router.put('/settings/background', requireAuth, (req, res) => {
-  const current = getBackgroundSettings()
-  const next = mergeBackground(req.body, current)
+router.put('/settings/background', requireAccountWrite, (req, res) => {
+  const store = resolveStore(req, res)
+  if (!store) return
+  const current = store.getBackgroundSettings()
+  const next = mergeBackground(req.body, current, store.slug)
 
   if (current.type === 'image' && next.type !== 'image') {
-    clearBackgroundImage(current)
+    clearBackgroundImage(store, current)
   }
 
-  res.json(setBackgroundSettings(next))
+  res.json(store.setBackgroundSettings(next))
 })
 
-router.post('/settings/background/image', requireAuth, upload.single('image'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Thiếu file ảnh' })
+router.post(
+  '/settings/background/image',
+  requireAccountWrite,
+  upload.single('image'),
+  (req, res) => {
+    const store = resolveStore(req, res)
+    if (!store) return
+    if (!req.file) return res.status(400).json({ error: 'Thiếu file ảnh' })
 
-  const current = getBackgroundSettings()
-  if (current.type === 'image' && current.filename) {
-    removeBackgroundFile(UPLOADS_DIR, current.filename)
-  }
+    const current = store.getBackgroundSettings()
+    if (current.type === 'image' && current.filename) {
+      removeBackgroundFile(store.uploadsDir, current.filename)
+    }
 
-  const settings = {
-    type: 'image',
-    imageUrl: `/uploads/${req.file.filename}`,
-    filename: req.file.filename,
-    fit: req.body.fit || current.fit || 'cover',
-    overlay: normalizeNumber(req.body.overlay, current.overlay ?? 0),
-  }
+    const settings = {
+      type: 'image',
+      imageUrl: `/uploads/${store.slug}/${req.file.filename}`,
+      filename: req.file.filename,
+      fit: req.body.fit || current.fit || 'cover',
+      overlay: normalizeNumber(req.body.overlay, current.overlay ?? 0),
+    }
 
-  res.json(setBackgroundSettings(settings))
-})
+    res.json(store.setBackgroundSettings(settings))
+  },
+)
 
 export default router

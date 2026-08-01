@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import JournalTable from '@/components/JournalTable.vue'
 import JournalToolbar from '@/components/JournalToolbar.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
@@ -7,9 +8,16 @@ import BackgroundToggle from '@/components/BackgroundToggle.vue'
 import LoginModal from '@/components/LoginModal.vue'
 import { useJournal } from '@/composables/useJournal'
 import { useAuth } from '@/composables/useAuth'
+import { useBackground } from '@/composables/useBackground'
 
-const { username, isAuthenticated, logout } = useAuth()
+const route = useRoute()
+const router = useRouter()
+const { username, isAuthenticated, isRoot, canEditSlug, logout } = useAuth()
 const showLogin = ref(false)
+
+const journalSlug = computed(() => String(route.params.slug ?? ''))
+
+useBackground(journalSlug)
 
 const {
   entries,
@@ -33,7 +41,7 @@ const {
   uploadImage,
   removeImage,
   reload,
-} = useJournal()
+} = useJournal(journalSlug)
 
 const totalClass = computed(() => {
   if (totalPnl.value > 0) return 'text-emerald-600 dark:text-emerald-400'
@@ -41,7 +49,13 @@ const totalClass = computed(() => {
   return 'text-zinc-500'
 })
 
-const readonly = computed(() => !isAuthenticated.value)
+const canEdit = computed(() => canEditSlug(journalSlug.value))
+const readonly = computed(() => !canEdit.value)
+
+async function onLogout() {
+  await logout()
+  router.push({ name: 'home' })
+}
 </script>
 
 <template>
@@ -50,9 +64,15 @@ const readonly = computed(() => !isAuthenticated.value)
       <div class="mx-auto flex max-w-[1600px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <div class="min-w-0">
           <div class="flex items-center gap-2">
-            <h1 class="truncate text-base font-semibold tracking-tight sm:text-lg">
+            <RouterLink
+              :to="{ name: 'home' }"
+              class="truncate text-base font-semibold tracking-tight hover:text-indigo-600 sm:text-lg dark:hover:text-indigo-400"
+            >
               Trading Journal
-            </h1>
+            </RouterLink>
+            <span class="truncate rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+              {{ journalSlug }}
+            </span>
             <span
               v-if="readonly"
               class="shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
@@ -61,12 +81,12 @@ const readonly = computed(() => !isAuthenticated.value)
             </span>
           </div>
           <p class="hidden text-xs text-zinc-500 sm:block">
-            {{ readonly ? 'Đăng nhập để chỉnh sửa nhật ký' : 'Ghi nhật ký giao dịch — paste ảnh chart bằng Ctrl+V' }}
+            {{ readonly ? 'Đăng nhập tài khoản này để chỉnh sửa' : 'Ghi nhật ký giao dịch — paste ảnh chart bằng Ctrl+V' }}
           </p>
         </div>
 
         <div class="flex shrink-0 items-center gap-2 sm:gap-3">
-          <div v-if="isAuthenticated" class="hidden items-center gap-3 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs dark:border-zinc-800 sm:flex">
+          <div v-if="canEdit" class="hidden items-center gap-3 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs dark:border-zinc-800 sm:flex">
             <div>
               <span class="text-zinc-400">PnL</span>
               <span :class="['ml-1.5 font-semibold tabular-nums', totalClass]">
@@ -88,7 +108,7 @@ const readonly = computed(() => !isAuthenticated.value)
           </div>
 
           <button
-            v-if="isAuthenticated"
+            v-if="canEdit"
             type="button"
             class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-indigo-500 sm:px-4 sm:py-2 sm:text-sm"
             :disabled="loading"
@@ -100,12 +120,20 @@ const readonly = computed(() => !isAuthenticated.value)
             Thêm dòng
           </button>
 
+          <RouterLink
+            v-if="isRoot"
+            :to="{ name: 'admin' }"
+            class="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            Accounts
+          </RouterLink>
+
           <template v-if="isAuthenticated">
             <span class="hidden text-xs text-zinc-500 sm:inline">{{ username }}</span>
             <button
               type="button"
               class="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              @click="logout"
+              @click="onLogout"
             >
               Đăng xuất
             </button>
@@ -119,13 +147,13 @@ const readonly = computed(() => !isAuthenticated.value)
             Đăng nhập
           </button>
 
-          <BackgroundToggle />
+          <BackgroundToggle v-if="canEdit" />
           <ThemeToggle />
         </div>
       </div>
 
       <div class="flex items-center gap-4 border-t border-zinc-100 px-4 py-2 text-xs dark:border-zinc-800/80 sm:hidden">
-        <div v-if="isAuthenticated">
+        <div v-if="canEdit">
           <span class="text-zinc-400">PnL </span>
           <span :class="['font-semibold tabular-nums', totalClass]">
             {{ totalPnl >= 0 ? '+' : '' }}{{ totalPnl.toFixed(1) }}
@@ -171,6 +199,7 @@ const readonly = computed(() => !isAuthenticated.value)
           :sort-field="sortField"
           :sort-direction="sortDirection"
           :has-any-entries="entries.length > 0"
+          :slug="journalSlug"
           :readonly="readonly"
           :upload-handler="uploadImage"
           :remove-image-handler="removeImage"

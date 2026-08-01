@@ -1,25 +1,46 @@
 import { Router } from 'express'
 import multer from 'multer'
 import path from 'path'
-import { isRequestAuthenticated, requireAuth } from '../auth.js'
-import { generateThumbnail, removeImageFiles } from '../images.js'
 import {
-  UPLOADS_DIR,
-  addEntryImage,
-  createEntry,
-  deleteEntry,
-  getAllEntries,
-  getDistinctPairs,
-  getDistinctTags,
-  getEntryById,
-  removeEntryImageById,
-  updateEntry,
-} from '../db.js'
+  getRequestSession,
+  requireAccountWrite,
+} from '../auth.js'
+import { generateThumbnail, removeImageFiles } from '../images.js'
+import { getAccountBySlug, isValidSlug } from '../accounts.js'
+import { openJournalStore } from '../db.js'
 
-const router = Router()
+const router = Router({ mergeParams: true })
+
+function resolveStore(req, res) {
+  const slug = req.params.slug
+  if (!isValidSlug(slug)) {
+    res.status(400).json({ error: 'Slug không hợp lệ' })
+    return null
+  }
+  const account = getAccountBySlug(slug)
+  if (!account || !account.active) {
+    res.status(404).json({ error: 'Không tìm thấy journal' })
+    return null
+  }
+  return openJournalStore(slug)
+}
+
+function canSeePrivate(req, slug) {
+  const session = getRequestSession(req)
+  if (!session) return false
+  if (session.role === 'root') return true
+  return session.role === 'user' && session.slug === slug
+}
 
 const storage = multer.diskStorage({
-  destination: UPLOADS_DIR,
+  destination: (req, _file, cb) => {
+    try {
+      const store = openJournalStore(req.params.slug)
+      cb(null, store.uploadsDir)
+    } catch (err) {
+      cb(err)
+    }
+  },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname) || '.png'
     cb(null, `${req.params.id}-img-${Date.now()}${ext}`)
@@ -36,36 +57,46 @@ const upload = multer({
 })
 
 router.get('/entries', (req, res) => {
-  const visibleOnly = !isRequestAuthenticated(req)
-  res.json(getAllEntries(visibleOnly))
+  const store = resolveStore(req, res)
+  if (!store) return
+  const visibleOnly = !canSeePrivate(req, store.slug)
+  res.json(store.getAllEntries(visibleOnly))
 })
 
 router.get('/entries/:id', (req, res) => {
+  const store = resolveStore(req, res)
+  if (!store) return
   const id = Number(req.params.id)
   if (!Number.isFinite(id)) {
     return res.status(400).json({ error: 'ID không hợp lệ' })
   }
-  const visibleOnly = !isRequestAuthenticated(req)
-  const entry = getEntryById(id, visibleOnly)
+  const privateView = canSeePrivate(req, store.slug)
+  const entry = store.getEntryById(id, !privateView)
   if (!entry) return res.status(404).json({ error: 'Không tìm thấy entry' })
-  if (!isRequestAuthenticated(req)) {
+  if (!privateView) {
     res.json({ ...entry, pnl: null })
     return
   }
   res.json(entry)
 })
 
-router.get('/pairs', (_req, res) => {
-  res.json(getDistinctPairs())
+router.get('/pairs', (req, res) => {
+  const store = resolveStore(req, res)
+  if (!store) return
+  res.json(store.getDistinctPairs())
 })
 
-router.get('/tags', (_req, res) => {
-  res.json(getDistinctTags())
+router.get('/tags', (req, res) => {
+  const store = resolveStore(req, res)
+  if (!store) return
+  res.json(store.getDistinctTags())
 })
 
-router.post('/entries', requireAuth, (req, res) => {
+router.post('/entries', requireAccountWrite, (req, res) => {
+  const store = resolveStore(req, res)
+  if (!store) return
   const today = new Date().toISOString().slice(0, 10)
-  const entry = createEntry({
+  const entry = store.createEntry({
     date: req.body.date ?? today,
     session: req.body.session ?? 'Asia',
     pair: req.body.pair ?? '',
@@ -78,12 +109,14 @@ router.post('/entries', requireAuth, (req, res) => {
   res.status(201).json(entry)
 })
 
-router.patch('/entries/:id', requireAuth, (req, res) => {
+router.patch('/entries/:id', requireAccountWrite, (req, res) => {
+  const store = resolveStore(req, res)
+  if (!store) return
   const id = Number(req.params.id)
-  const existing = getEntryById(id)
+  const existing = store.getEntryById(id)
   if (!existing) return res.status(404).json({ error: 'Không tìm thấy entry' })
 
-  const entry = updateEntry(id, {
+  const entry = store.updateEntry(id, {
     date: req.body.date ?? existing.date,
     session: req.body.session ?? existing.session,
     pair: req.body.pair ?? existing.pair,
@@ -96,39 +129,50 @@ router.patch('/entries/:id', requireAuth, (req, res) => {
   res.json(entry)
 })
 
-router.delete('/entries/:id', requireAuth, (req, res) => {
+router.delete('/entries/:id', requireAccountWrite, (req, res) => {
+  const store = resolveStore(req, res)
+  if (!store) return
   const id = Number(req.params.id)
-  if (!deleteEntry(id)) return res.status(404).json({ error: 'Không tìm thấy entry' })
+  if (!store.deleteEntry(id)) return res.status(404).json({ error: 'Không tìm thấy entry' })
   res.status(204).end()
 })
 
-router.post('/entries/:id/images', requireAuth, upload.single('image'), async (req, res) => {
-  const id = Number(req.params.id)
-  if (!getEntryById(id)) {
-    return res.status(404).json({ error: 'Không tìm thấy entry' })
-  }
-  if (!req.file) {
-    return res.status(400).json({ error: 'Thiếu file ảnh' })
-  }
+router.post(
+  '/entries/:id/images',
+  requireAccountWrite,
+  upload.single('image'),
+  async (req, res) => {
+    const store = resolveStore(req, res)
+    if (!store) return
+    const id = Number(req.params.id)
+    if (!store.getEntryById(id)) {
+      return res.status(404).json({ error: 'Không tìm thấy entry' })
+    }
+    if (!req.file) {
+      return res.status(400).json({ error: 'Thiếu file ảnh' })
+    }
 
-  try {
-    await generateThumbnail(UPLOADS_DIR, req.file.filename)
-    const entry = addEntryImage(id, req.file.filename)
-    res.json(entry)
-  } catch (err) {
-    removeImageFiles(UPLOADS_DIR, req.file.filename)
-    res.status(500).json({ error: err.message || 'Không tạo được thumbnail' })
-  }
-})
+    try {
+      await generateThumbnail(store.uploadsDir, req.file.filename)
+      const entry = store.addEntryImage(id, req.file.filename)
+      res.json(entry)
+    } catch (err) {
+      removeImageFiles(store.uploadsDir, req.file.filename)
+      res.status(500).json({ error: err.message || 'Không tạo được thumbnail' })
+    }
+  },
+)
 
-router.delete('/entries/:id/images/:imageId', requireAuth, (req, res) => {
+router.delete('/entries/:id/images/:imageId', requireAccountWrite, (req, res) => {
+  const store = resolveStore(req, res)
+  if (!store) return
   const id = Number(req.params.id)
   const imageId = Number(req.params.imageId)
   if (!Number.isFinite(imageId)) {
     return res.status(400).json({ error: 'ID ảnh không hợp lệ' })
   }
 
-  const entry = removeEntryImageById(id, imageId)
+  const entry = store.removeEntryImageById(id, imageId)
   if (!entry) return res.status(404).json({ error: 'Không tìm thấy entry hoặc ảnh' })
   res.json(entry)
 })

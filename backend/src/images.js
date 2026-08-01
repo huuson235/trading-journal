@@ -8,13 +8,14 @@ export function thumbFilename(originalFilename) {
   return `${base}-thumb.webp`
 }
 
-export function resolveThumbUrl(uploadsDir, originalFilename) {
+export function resolveThumbUrl(uploadsDir, originalFilename, slug) {
   if (!originalFilename) return null
+  const prefix = slug ? `/uploads/${slug}` : '/uploads'
   const thumbName = thumbFilename(originalFilename)
   if (fs.existsSync(path.join(uploadsDir, thumbName))) {
-    return `/uploads/${thumbName}`
+    return `${prefix}/${thumbName}`
   }
-  return `/uploads/${originalFilename}`
+  return `${prefix}/${originalFilename}`
 }
 
 export async function generateThumbnail(uploadsDir, originalFilename) {
