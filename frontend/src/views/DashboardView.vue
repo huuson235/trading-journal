@@ -6,14 +6,16 @@ import JournalToolbar from '@/components/JournalToolbar.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import BackgroundToggle from '@/components/BackgroundToggle.vue'
 import LoginModal from '@/components/LoginModal.vue'
+import ChangePasswordModal from '@/components/ChangePasswordModal.vue'
 import { useJournal } from '@/composables/useJournal'
 import { useAuth } from '@/composables/useAuth'
 import { useBackground } from '@/composables/useBackground'
 
 const route = useRoute()
 const router = useRouter()
-const { username, isAuthenticated, isRoot, canEditSlug, logout } = useAuth()
+const { username, isAuthenticated, isRoot, isUser, canEditSlug, logout } = useAuth()
 const showLogin = ref(false)
+const showChangePassword = ref(false)
 
 const journalSlug = computed(() => String(route.params.slug ?? ''))
 
@@ -28,7 +30,9 @@ const {
   sortDirection,
   setSort,
   resetToCurrentWeek,
+  resetToPreviousWeek,
   resetToCurrentMonth,
+  resetToPreviousMonth,
   pairSuggestions,
   tagSuggestions,
   loading,
@@ -131,6 +135,14 @@ async function onLogout() {
           <template v-if="isAuthenticated">
             <span class="hidden text-xs text-zinc-500 sm:inline">{{ username }}</span>
             <button
+              v-if="isUser"
+              type="button"
+              class="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              @click="showChangePassword = true"
+            >
+              Đổi MK
+            </button>
+            <button
               type="button"
               class="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
               @click="onLogout"
@@ -188,7 +200,9 @@ async function onLogout() {
           :result-count="visibleEntries.length"
           :total-count="entries.length"
           @reset-week="resetToCurrentWeek"
+          @reset-previous-week="resetToPreviousWeek"
           @reset-month="resetToCurrentMonth"
+          @reset-previous-month="resetToPreviousMonth"
           @sort="setSort"
         />
 
@@ -210,5 +224,6 @@ async function onLogout() {
     </main>
 
     <LoginModal v-model:open="showLogin" />
+    <ChangePasswordModal v-model:open="showChangePassword" />
   </div>
 </template>

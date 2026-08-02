@@ -32,3 +32,10 @@ export function fetchMe() {
 export function fetchPublicAccounts() {
   return request<PublicAccount[]>('/api/auth/accounts')
 }
+
+export function changePassword(currentPassword: string, newPassword: string) {
+  return request<{ ok: boolean }>('/api/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  })
+}

@@ -3,7 +3,12 @@ import type { JournalEntry, SortDirection, SortField } from '@/types/journal'
 import * as journalApi from '@/api/journal'
 import { getAuthToken } from '@/api/client'
 import { debounce } from '@/utils/debounce'
-import { getCurrentMonthRange, getCurrentWeekRange } from '@/utils/date'
+import {
+  getCurrentMonthRange,
+  getCurrentWeekRange,
+  getPreviousMonthRange,
+  getPreviousWeekRange,
+} from '@/utils/date'
 import { filterEntriesByDate, sortEntries, toggleSort } from '@/utils/entriesView'
 import { useAuth } from '@/composables/useAuth'
 
@@ -140,8 +145,20 @@ export function useJournal(slugSource: MaybeRefOrGetter<string>) {
     dateTo.value = range.to
   }
 
+  function resetToPreviousWeek() {
+    const range = getPreviousWeekRange()
+    dateFrom.value = range.from
+    dateTo.value = range.to
+  }
+
   function resetToCurrentMonth() {
     const range = getCurrentMonthRange()
+    dateFrom.value = range.from
+    dateTo.value = range.to
+  }
+
+  function resetToPreviousMonth() {
+    const range = getPreviousMonthRange()
     dateFrom.value = range.from
     dateTo.value = range.to
   }
@@ -230,7 +247,9 @@ export function useJournal(slugSource: MaybeRefOrGetter<string>) {
     sortDirection,
     setSort,
     resetToCurrentWeek,
+    resetToPreviousWeek,
     resetToCurrentMonth,
+    resetToPreviousMonth,
     pairSuggestions: allPairSuggestions,
     tagSuggestions: allTagSuggestions,
     loading,

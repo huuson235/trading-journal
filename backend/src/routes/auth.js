@@ -6,7 +6,7 @@ import {
   requireAuth,
   revokeToken,
 } from '../auth.js'
-import { listAccounts } from '../accounts.js'
+import { listAccounts, changeOwnPassword } from '../accounts.js'
 
 const router = Router()
 
@@ -37,6 +37,21 @@ router.get('/me', requireAuth, (req, res) => {
     role: session.role,
     slug: session.slug ?? null,
   })
+})
+
+router.post('/change-password', requireAuth, (req, res) => {
+  const session = req.session
+  if (session.role !== 'user' || !session.accountId) {
+    return res.status(403).json({ error: 'Chỉ account thường mới đổi password tại đây' })
+  }
+
+  const { currentPassword, newPassword } = req.body ?? {}
+  try {
+    changeOwnPassword(session.accountId, currentPassword, newPassword)
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(400).json({ error: err.message || 'Không đổi được password' })
+  }
 })
 
 /** Danh sách account public (để chọn journal xem) */

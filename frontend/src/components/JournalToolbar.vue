@@ -15,7 +15,9 @@ defineProps<{
 
 const emit = defineEmits<{
   resetWeek: []
+  resetPreviousWeek: []
   resetMonth: []
+  resetPreviousMonth: []
   sort: [field: SortField]
 }>()
 
@@ -60,9 +62,23 @@ function sortIcon(field: SortField, activeField: SortField, direction: SortDirec
       <button
         type="button"
         class="rounded-md border border-zinc-200 px-2.5 py-1.5 text-xs text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        @click="emit('resetPreviousWeek')"
+      >
+        Tuần trước
+      </button>
+      <button
+        type="button"
+        class="rounded-md border border-zinc-200 px-2.5 py-1.5 text-xs text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
         @click="emit('resetMonth')"
       >
         Tháng này
+      </button>
+      <button
+        type="button"
+        class="rounded-md border border-zinc-200 px-2.5 py-1.5 text-xs text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        @click="emit('resetPreviousMonth')"
+      >
+        Tháng trước
       </button>
       <span class="ml-auto text-xs text-zinc-400">
         {{ resultCount }}/{{ totalCount }} giao dịch

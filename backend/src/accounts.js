@@ -190,6 +190,32 @@ export function updateAccount(id, { username, password, active } = {}) {
   return getAccountById(id)
 }
 
+export function changeOwnPassword(accountId, currentPassword, newPassword) {
+  const existing = accountsDb.prepare('SELECT * FROM accounts WHERE id = ?').get(accountId)
+  if (!existing) throw new Error('Không tìm thấy account')
+  if (!existing.active) throw new Error('Account đã bị vô hiệu')
+  if (!verifyPassword(currentPassword, existing.password_hash, existing.password_salt)) {
+    throw new Error('Password hiện tại không đúng')
+  }
+  if (!newPassword || String(newPassword).length < 4) {
+    throw new Error('Password mới phải có ít nhất 4 ký tự')
+  }
+  if (currentPassword === newPassword) {
+    throw new Error('Password mới phải khác password hiện tại')
+  }
+
+  const { hash, salt } = hashPassword(newPassword)
+  accountsDb
+    .prepare(
+      `UPDATE accounts SET
+        password_hash = ?, password_salt = ?, updated_at = datetime('now')
+       WHERE id = ?`,
+    )
+    .run(hash, salt, accountId)
+
+  return getAccountById(accountId)
+}
+
 export function deleteAccount(id) {
   const account = getAccountById(id)
   if (!account) return false
