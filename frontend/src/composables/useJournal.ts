@@ -129,9 +129,19 @@ export function useJournal(slugSource: MaybeRefOrGetter<string>) {
     statsEntries.value.reduce((sum, e) => sum + pnlValue(e.pnl), 0),
   )
 
+  const totalRrReality = computed(() =>
+    statsEntries.value.reduce((sum, e) => sum + pnlValue(e.rrReality), 0),
+  )
+
   const winCount = computed(() =>
     statsEntries.value.filter((e) => pnlValue(e.pnl) > 0).length,
   )
+
+  const winRate = computed(() => {
+    const total = statsEntries.value.length
+    if (total === 0) return 0
+    return Math.round((winCount.value / total) * 100)
+  })
 
   function setSort(field: SortField) {
     const next = toggleSort(field, sortField.value, sortDirection.value)
@@ -255,7 +265,9 @@ export function useJournal(slugSource: MaybeRefOrGetter<string>) {
     loading,
     error,
     totalPnl,
+    totalRrReality,
     winCount,
+    winRate,
     addEntry,
     removeEntry,
     uploadImage,

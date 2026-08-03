@@ -1,6 +1,8 @@
 backend/.env
 backend/dist/
+backend/data/*
 backend/data/users/*
+backend/uploads/*
 backend/uploads/users/*
 !backend/uploads/.gitkeep
 !backend/data/.gitkeep

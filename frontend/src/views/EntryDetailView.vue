@@ -138,8 +138,16 @@ watch([entryId, journalSlug], loadEntry)
 
           <div class="flex flex-wrap gap-3">
             <div class="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
-              <div class="text-[10px] font-medium uppercase tracking-wide text-zinc-400">R:R</div>
-              <div class="mt-0.5 text-xl font-semibold tabular-nums">{{ formatRr(entry.rr) }}</div>
+              <div class="text-[10px] font-medium uppercase tracking-wide text-zinc-400">R:R plan</div>
+              <div class="mt-0.5 text-xl font-semibold tabular-nums">{{ formatRr(entry.rrPlan) }}</div>
+            </div>
+            <div class="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+              <div class="text-[10px] font-medium uppercase tracking-wide text-zinc-400">R:R reality</div>
+              <div class="mt-0.5 text-xl font-semibold tabular-nums">{{ formatRr(entry.rrReality) }}</div>
+            </div>
+            <div class="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
+              <div class="text-[10px] font-medium uppercase tracking-wide text-zinc-400">Checklist</div>
+              <div class="mt-0.5 text-xl font-semibold">{{ entry.checklist ? '✓' : '—' }}</div>
             </div>
             <div
               v-if="canSeePnl"
@@ -168,6 +176,16 @@ watch([entryId, journalSlug], loadEntry)
               {{ tag }}
             </span>
           </div>
+        </section>
+
+        <section
+          v-if="(entry.note ?? '').trim()"
+          class="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
+        >
+          <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">Note</h2>
+          <p class="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+            {{ entry.note }}
+          </p>
         </section>
 
         <section v-if="entry.images.length > 0" class="space-y-4">

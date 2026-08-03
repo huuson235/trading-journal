@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { reactive } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { JournalEntry, SortDirection, SortField } from '@/types/journal'
 import ImagesCell from './ImagesCell.vue'
@@ -23,6 +24,17 @@ const emit = defineEmits<{
   remove: [id: number]
   sort: [field: SortField]
 }>()
+
+/** entryId → note textarea đang mở (mặc định ẩn) */
+const noteOpen = reactive<Record<number, boolean>>({})
+
+function toggleNote(id: number) {
+  noteOpen[id] = !noteOpen[id]
+}
+
+function isNoteOpen(id: number) {
+  return Boolean(noteOpen[id])
+}
 
 const cellInput =
   'w-full min-w-0 rounded border-0 bg-transparent px-1 py-1 text-[11px] sm:text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400/50 dark:focus:ring-indigo-500/50'
@@ -79,6 +91,10 @@ function sortMark(field: SortField, active: SortField, dir: SortDirection) {
 function thClass(field: SortField, active: SortField) {
   return field === active ? 'text-indigo-600 dark:text-indigo-400' : ''
 }
+
+function hasNote(entry: JournalEntry) {
+  return Boolean(entry.note?.trim())
+}
 </script>
 
 <template>
@@ -87,7 +103,7 @@ function thClass(field: SortField, active: SortField) {
       class="hidden overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 md:block"
     >
       <div class="overflow-x-auto">
-        <table class="w-full min-w-[792px] border-collapse text-left">
+        <table class="w-full min-w-[920px] border-collapse text-left">
           <thead>
             <tr class="border-b border-zinc-200 bg-zinc-50 text-[10px] font-medium uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-400">
               <th class="sticky left-0 z-20 w-9 bg-zinc-50 px-1.5 py-1.5 dark:bg-zinc-900/80">No.</th>
@@ -101,9 +117,19 @@ function thClass(field: SortField, active: SortField) {
                   Pair <span class="text-[9px]">{{ sortMark('pair', sortField, sortDirection) }}</span>
                 </button>
               </th>
-              <th class="w-10 px-1.5 py-1.5 text-right">
-                <button type="button" :class="[sortableTh, 'justify-end', thClass('rr', sortField)]" @click="emit('sort', 'rr')">
-                  R:R <span class="text-[9px]">{{ sortMark('rr', sortField, sortDirection) }}</span>
+              <th class="w-12 px-1.5 py-1.5 text-right" title="R:R plan">
+                <button type="button" :class="[sortableTh, 'justify-end', thClass('rrPlan', sortField)]" @click="emit('sort', 'rrPlan')">
+                  R:R Plan <span class="text-[9px]">{{ sortMark('rrPlan', sortField, sortDirection) }}</span>
+                </button>
+              </th>
+              <th class="w-12 px-1.5 py-1.5 text-right" title="R:R reality">
+                <button type="button" :class="[sortableTh, 'justify-end', thClass('rrReality', sortField)]" @click="emit('sort', 'rrReality')">
+                  R:R Real <span class="text-[9px]">{{ sortMark('rrReality', sortField, sortDirection) }}</span>
+                </button>
+              </th>
+              <th class="w-10 px-1.5 py-1.5 text-center" title="Checklist">
+                <button type="button" :class="[sortableTh, 'justify-center', thClass('checklist', sortField)]" @click="emit('sort', 'checklist')">
+                  Checklist <span class="text-[9px]">{{ sortMark('checklist', sortField, sortDirection) }}</span>
                 </button>
               </th>
               <th v-if="!readonly" class="w-12 px-1.5 py-2 text-right">
@@ -117,114 +143,170 @@ function thClass(field: SortField, active: SortField) {
             </tr>
           </thead>
           <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
-            <tr
-              v-for="entry in entries"
-              :key="entry.id"
-              class="group min-h-[2.25rem] transition-colors"
-              :class="[rowBgClass(entry.pnl), !entry.visible ? 'opacity-50' : '']"
-            >
-              <td :class="['sticky left-0 z-10 whitespace-nowrap px-1.5 py-1 font-mono text-[11px] text-zinc-400', stickyCellClass(entry.pnl)]">
-                {{ entry.no }}
-              </td>
-              <td :class="['sticky left-9 z-10 min-w-[104px] whitespace-nowrap px-0.5 py-1', stickyCellClass(entry.pnl)]">
-                <DateInput v-model="entry.date" :input-class="cellInput" :readonly="readonly" />
-              </td>
-              <td class="min-w-[76px] whitespace-nowrap px-0.5 py-1">
-                <PairInput
-                  v-model="entry.pair"
-                  :suggestions="pairSuggestions"
-                  :input-class="cellInput + ' uppercase'"
-                  placeholder="—"
-                  :readonly="readonly"
-                />
-              </td>
-              <td class="whitespace-nowrap px-0.5 py-1">
-                <input
-                  v-model.number="entry.rr"
-                  type="number"
-                  step="any"
-                  placeholder="—"
-                  :readonly="readonly"
-                  :class="cellInput + ' no-spinner text-right'"
-                />
-              </td>
-              <td v-if="!readonly" class="whitespace-nowrap px-0.5 py-1">
-                <input
-                  v-model.number="entry.pnl"
-                  type="number"
-                  step="any"
-                  placeholder="—"
-                  :readonly="readonly"
-                  :class="[cellInput, 'no-spinner text-right font-medium', pnlClass(entry.pnl)]"
-                />
-              </td>
-              <td class="min-w-[180px] max-w-[240px] align-middle px-0.5 py-1">
-                <TagsInput
-                  v-model="entry.tags"
-                  :suggestions="tagSuggestions"
-                  :readonly="readonly"
-                />
-              </td>
-              <td class="min-w-[180px] w-[180px] align-middle px-0.5 py-1">
-                <ImagesCell
-                  :entry-id="entry.id"
-                  :images="entry.images"
-                  :readonly="readonly"
-                  :upload-handler="readonly ? undefined : uploadHandler"
-                  :remove-image-handler="readonly ? undefined : removeImageHandler"
-                />
-              </td>
-              <td class="whitespace-nowrap px-0.5 py-1">
-                <div class="flex items-center justify-end gap-0.5">
-                  <button
-                    v-if="!readonly"
-                    type="button"
-                    :class="[
-                      actionBtn,
-                      entry.visible
-                        ? 'text-zinc-400 opacity-70 group-hover:opacity-100'
-                        : 'text-amber-500 opacity-100',
-                    ]"
-                    :title="entry.visible ? 'Đang hiện — click để ẩn khỏi người xem' : 'Đang ẩn — click để hiện'"
-                    @click="entry.visible = !entry.visible"
-                  >
-                    <svg v-if="entry.visible" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
-                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                      <circle cx="12" cy="12" r="3" />
-                    </svg>
-                    <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
-                      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
-                      <path d="M10.73 5.08A10.43 10.43 0 0 1 12.05 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
-                      <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
-                      <line x1="2" x2="22" y1="2" y2="22" />
-                    </svg>
-                  </button>
-                  <RouterLink
-                    v-if="entry.visible"
-                    :to="{ name: 'entry-detail', params: { slug, id: entry.id } }"
-                    target="_blank"
-                    :class="[actionBtn, 'opacity-70 group-hover:opacity-100']"
-                    title="Xem & chia sẻ"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
-                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                    </svg>
-                  </RouterLink>
-                  <button
-                    v-if="!readonly"
-                    type="button"
-                    class="rounded p-0.5 text-zinc-300 opacity-0 transition hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100 dark:hover:bg-rose-950/50 dark:hover:text-rose-400"
-                    title="Xóa"
-                    @click="emit('remove', entry.id)"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
-                      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    </svg>
-                  </button>
-                </div>
-              </td>
-            </tr>
+            <template v-for="entry in entries" :key="entry.id">
+              <tr
+                class="group min-h-[2.25rem] transition-colors"
+                :class="[rowBgClass(entry.pnl), !entry.visible ? 'opacity-50' : '']"
+              >
+                <td :class="['sticky left-0 z-10 whitespace-nowrap px-1.5 py-1 font-mono text-[11px] text-zinc-400', stickyCellClass(entry.pnl)]">
+                  {{ entry.no }}
+                </td>
+                <td :class="['sticky left-9 z-10 min-w-[104px] whitespace-nowrap px-0.5 py-1', stickyCellClass(entry.pnl)]">
+                  <DateInput v-model="entry.date" :input-class="cellInput" :readonly="readonly" />
+                </td>
+                <td class="min-w-[76px] whitespace-nowrap px-0.5 py-1">
+                  <PairInput
+                    v-model="entry.pair"
+                    :suggestions="pairSuggestions"
+                    :input-class="cellInput + ' uppercase'"
+                    placeholder="—"
+                    :readonly="readonly"
+                  />
+                </td>
+                <td class="whitespace-nowrap px-0.5 py-1">
+                  <input
+                    v-model.number="entry.rrPlan"
+                    type="number"
+                    step="any"
+                    placeholder="—"
+                    :readonly="readonly"
+                    :class="cellInput + ' no-spinner text-right'"
+                    title="R:R plan"
+                  />
+                </td>
+                <td class="whitespace-nowrap px-0.5 py-1">
+                  <input
+                    v-model.number="entry.rrReality"
+                    type="number"
+                    step="any"
+                    placeholder="—"
+                    :readonly="readonly"
+                    :class="cellInput + ' no-spinner text-right'"
+                    title="R:R reality"
+                  />
+                </td>
+                <td class="whitespace-nowrap px-0.5 py-1 text-center">
+                  <input
+                    v-model="entry.checklist"
+                    type="checkbox"
+                    class="h-3.5 w-3.5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-400/50 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-800"
+                    :disabled="readonly"
+                    title="Checklist"
+                  />
+                </td>
+                <td v-if="!readonly" class="whitespace-nowrap px-0.5 py-1">
+                  <input
+                    v-model.number="entry.pnl"
+                    type="number"
+                    step="any"
+                    placeholder="—"
+                    :readonly="readonly"
+                    :class="[cellInput, 'no-spinner text-right font-medium', pnlClass(entry.pnl)]"
+                  />
+                </td>
+                <td class="min-w-[180px] max-w-[240px] align-middle px-0.5 py-1">
+                  <TagsInput
+                    v-model="entry.tags"
+                    :suggestions="tagSuggestions"
+                    :readonly="readonly"
+                  />
+                </td>
+                <td class="min-w-[180px] w-[180px] align-middle px-0.5 py-1">
+                  <ImagesCell
+                    :entry-id="entry.id"
+                    :images="entry.images"
+                    :readonly="readonly"
+                    :upload-handler="readonly ? undefined : uploadHandler"
+                    :remove-image-handler="readonly ? undefined : removeImageHandler"
+                  />
+                </td>
+                <td class="whitespace-nowrap px-0.5 py-1">
+                  <div class="flex items-center justify-end gap-0.5">
+                    <button
+                      v-if="!readonly"
+                      type="button"
+                      :class="[
+                        actionBtn,
+                        isNoteOpen(entry.id)
+                          ? 'text-indigo-600 opacity-100 dark:text-indigo-400'
+                          : hasNote(entry)
+                            ? 'text-indigo-500/80 opacity-100'
+                            : 'opacity-70 group-hover:opacity-100',
+                      ]"
+                      :title="isNoteOpen(entry.id) ? 'Ẩn note' : 'Hiện note'"
+                      @click="toggleNote(entry.id)"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
+                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                        <polyline points="14 2 14 8 20 8" />
+                        <line x1="16" x2="8" y1="13" y2="13" />
+                        <line x1="16" x2="8" y1="17" y2="17" />
+                        <line x1="10" x2="8" y1="9" y2="9" />
+                      </svg>
+                    </button>
+                    <button
+                      v-if="!readonly"
+                      type="button"
+                      :class="[
+                        actionBtn,
+                        entry.visible
+                          ? 'text-zinc-400 opacity-70 group-hover:opacity-100'
+                          : 'text-amber-500 opacity-100',
+                      ]"
+                      :title="entry.visible ? 'Đang hiện — click để ẩn khỏi người xem' : 'Đang ẩn — click để hiện'"
+                      @click="entry.visible = !entry.visible"
+                    >
+                      <svg v-if="entry.visible" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
+                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                      <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
+                        <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                        <path d="M10.73 5.08A10.43 10.43 0 0 1 12.05 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+                        <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+                        <line x1="2" x2="22" y1="2" y2="22" />
+                      </svg>
+                    </button>
+                    <RouterLink
+                      v-if="entry.visible"
+                      :to="{ name: 'entry-detail', params: { slug, id: entry.id } }"
+                      target="_blank"
+                      :class="[actionBtn, 'opacity-70 group-hover:opacity-100']"
+                      title="Xem & chia sẻ"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                      </svg>
+                    </RouterLink>
+                    <button
+                      v-if="!readonly"
+                      type="button"
+                      class="rounded p-0.5 text-zinc-300 opacity-0 transition hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100 dark:hover:bg-rose-950/50 dark:hover:text-rose-400"
+                      title="Xóa"
+                      @click="emit('remove', entry.id)"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
+                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                      </svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr
+                v-if="!readonly && isNoteOpen(entry.id)"
+                :class="[rowBgClass(entry.pnl), !entry.visible ? 'opacity-50' : '']"
+              >
+                <td :colspan="readonly ? 9 : 10" class="px-1.5 pb-2 pt-0">
+                  <textarea
+                    v-model="entry.note"
+                    rows="5"
+                    placeholder="Note..."
+                    class="w-full resize-y rounded-md border border-zinc-200 bg-white/80 px-2 py-1.5 text-xs text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-indigo-400/50 dark:border-zinc-700 dark:bg-zinc-950/40 dark:text-zinc-300 dark:placeholder:text-zinc-600 dark:focus:ring-indigo-500/50"
+                  />
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -262,6 +344,29 @@ function thClass(field: SortField, active: SortField) {
             />
           </div>
           <div class="flex items-center gap-1">
+            <button
+              v-if="!readonly"
+              type="button"
+              :class="[
+                actionBtn,
+                'p-1',
+                isNoteOpen(entry.id)
+                  ? 'text-indigo-600 dark:text-indigo-400'
+                  : hasNote(entry)
+                    ? 'text-indigo-500'
+                    : '',
+              ]"
+              :title="isNoteOpen(entry.id) ? 'Ẩn note' : 'Hiện note'"
+              @click="toggleNote(entry.id)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
+                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" x2="8" y1="13" y2="13" />
+                <line x1="16" x2="8" y1="17" y2="17" />
+                <line x1="10" x2="8" y1="9" y2="9" />
+              </svg>
+            </button>
             <button
               v-if="!readonly"
               type="button"
@@ -311,9 +416,24 @@ function thClass(field: SortField, active: SortField) {
               :readonly="readonly"
             />
           </div>
+          <div class="flex items-end gap-3 pb-1">
+            <label class="inline-flex items-center gap-1.5 text-[10px] uppercase text-zinc-400">
+              <input
+                v-model="entry.checklist"
+                type="checkbox"
+                class="h-3.5 w-3.5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-400/50 disabled:opacity-60 dark:border-zinc-600"
+                :disabled="readonly"
+              />
+              Checklist
+            </label>
+          </div>
           <div>
-            <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">R:R</label>
-            <input v-model.number="entry.rr" type="number" step="any" :readonly="readonly" :class="mobileInput + ' no-spinner'" />
+            <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">R:R plan</label>
+            <input v-model.number="entry.rrPlan" type="number" step="any" :readonly="readonly" :class="mobileInput + ' no-spinner'" />
+          </div>
+          <div>
+            <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">R:R reality</label>
+            <input v-model.number="entry.rrReality" type="number" step="any" :readonly="readonly" :class="mobileInput + ' no-spinner'" />
           </div>
           <div v-if="!readonly" class="col-span-2">
             <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">PnL</label>
@@ -334,6 +454,16 @@ function thClass(field: SortField, active: SortField) {
             v-model="entry.tags"
             :suggestions="tagSuggestions"
             :readonly="readonly"
+          />
+        </div>
+
+        <div v-if="!readonly && isNoteOpen(entry.id)" class="mb-2">
+          <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">Note</label>
+          <textarea
+            v-model="entry.note"
+            rows="2"
+            placeholder="Note..."
+            class="w-full resize-y rounded border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-indigo-400/50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:placeholder:text-zinc-600"
           />
         </div>
 

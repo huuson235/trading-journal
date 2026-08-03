@@ -36,8 +36,14 @@ export function sortEntries(
       case 'pnl':
         cmp = nullNumberOrder(a.pnl, direction) - nullNumberOrder(b.pnl, direction)
         break
-      case 'rr':
-        cmp = nullNumberOrder(a.rr, direction) - nullNumberOrder(b.rr, direction)
+      case 'rrPlan':
+        cmp = nullNumberOrder(a.rrPlan, direction) - nullNumberOrder(b.rrPlan, direction)
+        break
+      case 'rrReality':
+        cmp = nullNumberOrder(a.rrReality, direction) - nullNumberOrder(b.rrReality, direction)
+        break
+      case 'checklist':
+        cmp = Number(a.checklist) - Number(b.checklist)
         break
       case 'pair':
         cmp = a.pair.localeCompare(b.pair, undefined, { sensitivity: 'base' })

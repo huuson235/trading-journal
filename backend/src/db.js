@@ -13,9 +13,9 @@ function normalizeTag(value) {
   return String(value ?? '').trim().toUpperCase()
 }
 
-function parseTagsFromNote(noteValue) {
-  if (!noteValue) return []
-  const trimmed = String(noteValue).trim()
+function parseTags(tagsValue) {
+  if (!tagsValue) return []
+  const trimmed = String(tagsValue).trim()
   if (!trimmed) return []
   if (trimmed.startsWith('[')) {
     try {
@@ -64,8 +64,12 @@ function createJournalStore(slug) {
       pair TEXT NOT NULL DEFAULT '',
       direction TEXT NOT NULL DEFAULT 'LONG',
       rr REAL,
+      rr_plan REAL,
+      rr_reality REAL,
+      checklist INTEGER NOT NULL DEFAULT 0,
       pnl REAL,
       note TEXT NOT NULL DEFAULT '',
+      tags TEXT NOT NULL DEFAULT '[]',
       visible INTEGER NOT NULL DEFAULT 1,
       htf_text TEXT NOT NULL DEFAULT '',
       mtf_text TEXT NOT NULL DEFAULT '',
@@ -104,6 +108,31 @@ function createJournalStore(slug) {
     if (!cols.includes('visible')) {
       db.exec('ALTER TABLE journal_entries ADD COLUMN visible INTEGER NOT NULL DEFAULT 1')
     }
+    if (!cols.includes('tags')) {
+      db.exec("ALTER TABLE journal_entries ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'")
+    }
+    if (!cols.includes('rr_plan')) {
+      db.exec('ALTER TABLE journal_entries ADD COLUMN rr_plan REAL')
+    }
+    if (!cols.includes('rr_reality')) {
+      db.exec('ALTER TABLE journal_entries ADD COLUMN rr_reality REAL')
+    }
+    if (!cols.includes('checklist')) {
+      db.exec('ALTER TABLE journal_entries ADD COLUMN checklist INTEGER NOT NULL DEFAULT 0')
+    }
+
+    const rrSplit = db.prepare("SELECT value FROM settings WHERE key = 'rr_plan_reality_split'").get()
+    if (!rrSplit) {
+      db.prepare(`
+        UPDATE journal_entries
+        SET rr_plan = rr
+        WHERE rr_plan IS NULL AND rr IS NOT NULL
+      `).run()
+      db.prepare(`
+        INSERT INTO settings (key, value) VALUES ('rr_plan_reality_split', '1')
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+      `).run()
+    }
 
     const migrated = db.prepare("SELECT value FROM settings WHERE key = 'images_migrated'").get()
     if (!migrated) {
@@ -140,7 +169,7 @@ function createJournalStore(slug) {
       for (const row of rows) {
         const trimmed = String(row.note ?? '').trim()
         if (!trimmed || trimmed.startsWith('[')) continue
-        update.run(serializeTags(parseTagsFromNote(row.note)), row.id)
+        update.run(serializeTags(parseTags(row.note)), row.id)
       }
       db.prepare(`
         INSERT INTO settings (key, value) VALUES ('notes_migrated_tags', '1')
@@ -159,16 +188,36 @@ function createJournalStore(slug) {
         NYL: 'NYL',
         NYP: 'NYP',
       }
-      const rows = db.prepare('SELECT id, session, note FROM journal_entries').all()
+      const rows = db.prepare('SELECT id, session, note, tags FROM journal_entries').all()
       const update = db.prepare('UPDATE journal_entries SET note = ? WHERE id = ?')
       for (const row of rows) {
         const tag = SESSION_TO_TAG[row.session] ?? 'ASIA'
-        const tags = parseTagsFromNote(row.note)
+        // Before note/tags split, tags live in `note`
+        const tags = parseTags(row.note)
         if (tags.includes(tag)) continue
         update.run(serializeTags([...tags, tag]), row.id)
       }
       db.prepare(`
         INSERT INTO settings (key, value) VALUES ('session_migrated_tags', '1')
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+      `).run()
+    }
+
+    // Split: tags JSON moved out of `note`; `note` becomes free-text memo
+    const noteTagsSplit = db
+      .prepare("SELECT value FROM settings WHERE key = 'note_tags_split'")
+      .get()
+    if (!noteTagsSplit) {
+      const rows = db.prepare('SELECT id, note, tags FROM journal_entries').all()
+      const update = db.prepare('UPDATE journal_entries SET tags = ?, note = ? WHERE id = ?')
+      for (const row of rows) {
+        const existingTags = parseTags(row.tags)
+        const fromNote = parseTags(row.note)
+        const merged = existingTags.length > 0 ? existingTags : fromNote
+        update.run(serializeTags(merged), '', row.id)
+      }
+      db.prepare(`
+        INSERT INTO settings (key, value) VALUES ('note_tags_split', '1')
         ON CONFLICT(key) DO UPDATE SET value = excluded.value
       `).run()
     }
@@ -194,6 +243,7 @@ function createJournalStore(slug) {
   }
 
   function rowToEntry(row) {
+    const rrPlan = normalizeNumber(row.rr_plan ?? row.rr)
     return {
       id: row.id,
       no: row.no,
@@ -202,9 +252,12 @@ function createJournalStore(slug) {
       session: row.session,
       pair: row.pair,
       direction: normalizeDirection(row.direction),
-      rr: normalizeNumber(row.rr),
+      rrPlan,
+      rrReality: normalizeNumber(row.rr_reality),
+      checklist: Boolean(row.checklist ?? 0),
       pnl: normalizeNumber(row.pnl),
-      tags: parseTagsFromNote(row.note),
+      note: String(row.note ?? ''),
+      tags: parseTags(row.tags),
       visible: Boolean(row.visible ?? 1),
       images: loadImages(row.id),
     }
@@ -249,9 +302,12 @@ function createJournalStore(slug) {
 
     createEntry(data) {
       const maxNo = db.prepare('SELECT COALESCE(MAX(no), 0) as m FROM journal_entries').get().m
+      const rrPlan = normalizeNumber(data.rrPlan ?? data.rr)
       const stmt = db.prepare(`
-        INSERT INTO journal_entries (no, date, session, pair, direction, rr, pnl, note, visible)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO journal_entries (
+          no, date, session, pair, direction, rr, rr_plan, rr_reality, checklist, pnl, note, tags, visible
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       const result = stmt.run(
         maxNo + 1,
@@ -259,8 +315,12 @@ function createJournalStore(slug) {
         data.session,
         data.pair ?? '',
         normalizeDirection(data.direction),
-        normalizeNumber(data.rr),
+        rrPlan,
+        rrPlan,
+        normalizeNumber(data.rrReality),
+        data.checklist === true ? 1 : 0,
         normalizeNumber(data.pnl),
+        String(data.note ?? ''),
         serializeTags(data.tags ?? []),
         data.visible === false ? 0 : 1,
       )
@@ -268,15 +328,19 @@ function createJournalStore(slug) {
     },
 
     updateEntry(id, data) {
-      const existing = db.prepare('SELECT id, note FROM journal_entries WHERE id = ?').get(id)
+      const existing = db.prepare('SELECT id, note, tags FROM journal_entries WHERE id = ?').get(id)
       if (!existing) return null
 
-      const noteValue =
-        data.tags !== undefined ? serializeTags(data.tags) : existing.note ?? '[]'
+      const tagsValue =
+        data.tags !== undefined ? serializeTags(data.tags) : existing.tags ?? '[]'
+      const noteValue = data.note !== undefined ? String(data.note ?? '') : existing.note ?? ''
+      const rrPlan = normalizeNumber(data.rrPlan ?? data.rr)
 
       db.prepare(`
         UPDATE journal_entries SET
-          date = ?, session = ?, pair = ?, direction = ?, rr = ?, pnl = ?, note = ?, visible = ?,
+          date = ?, session = ?, pair = ?, direction = ?,
+          rr = ?, rr_plan = ?, rr_reality = ?, checklist = ?,
+          pnl = ?, note = ?, tags = ?, visible = ?,
           updated_at = datetime('now')
         WHERE id = ?
       `).run(
@@ -284,9 +348,13 @@ function createJournalStore(slug) {
         data.session,
         data.pair ?? '',
         normalizeDirection(data.direction),
-        normalizeNumber(data.rr),
+        rrPlan,
+        rrPlan,
+        normalizeNumber(data.rrReality),
+        data.checklist === true ? 1 : 0,
         normalizeNumber(data.pnl),
         noteValue,
+        tagsValue,
         data.visible === false ? 0 : 1,
         id,
       )
@@ -337,11 +405,11 @@ function createJournalStore(slug) {
 
     getDistinctTags() {
       const rows = db
-        .prepare(`SELECT note FROM journal_entries WHERE note IS NOT NULL AND TRIM(note) != ''`)
+        .prepare(`SELECT tags FROM journal_entries WHERE tags IS NOT NULL AND TRIM(tags) != '' AND TRIM(tags) != '[]'`)
         .all()
       const set = new Set()
       for (const row of rows) {
-        for (const tag of parseTagsFromNote(row.note)) {
+        for (const tag of parseTags(row.tags)) {
           set.add(tag)
         }
       }

@@ -15,8 +15,11 @@ export interface JournalEntry {
   session: Session
   pair: string
   direction: Direction
-  rr: number | null
+  rrPlan: number | null
+  rrReality: number | null
+  checklist: boolean
   pnl: number | null
+  note: string
   tags: string[]
   visible: boolean
   images: EntryImage[]
@@ -25,5 +28,5 @@ export interface JournalEntry {
 export const SESSIONS: Session[] = ['Asia', 'London', 'NYA', 'NYL', 'NYP']
 export const DIRECTIONS: Direction[] = ['LONG', 'SHORT']
 
-export type SortField = 'date' | 'pnl' | 'rr' | 'pair' | 'result'
+export type SortField = 'date' | 'pnl' | 'rrPlan' | 'rrReality' | 'checklist' | 'pair' | 'result'
 export type SortDirection = 'asc' | 'desc'

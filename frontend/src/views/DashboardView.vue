@@ -38,7 +38,9 @@ const {
   loading,
   error,
   totalPnl,
+  totalRrReality,
   winCount,
+  winRate,
   statsEntries,
   addEntry,
   removeEntry,
@@ -47,14 +49,30 @@ const {
   reload,
 } = useJournal(journalSlug)
 
+function formatSigned(value: number, digits = 1) {
+  const n = value.toFixed(digits)
+  return `${value >= 0 ? '+' : ''}${n}`
+}
+
 const totalClass = computed(() => {
   if (totalPnl.value > 0) return 'text-emerald-600 dark:text-emerald-400'
   if (totalPnl.value < 0) return 'text-rose-600 dark:text-rose-400'
   return 'text-zinc-500'
 })
 
+const rrRealityClass = computed(() => {
+  if (totalRrReality.value > 0) return 'text-emerald-600 dark:text-emerald-400'
+  if (totalRrReality.value < 0) return 'text-rose-600 dark:text-rose-400'
+  return 'text-zinc-500'
+})
+
 const canEdit = computed(() => canEditSlug(journalSlug.value))
 const readonly = computed(() => !canEdit.value)
+
+const winSummary = computed(() => {
+  const total = statsEntries.value.length
+  return `${winCount.value}/${total} (${winRate.value}%)`
+})
 
 async function onLogout() {
   await logout()
@@ -90,25 +108,21 @@ async function onLogout() {
         </div>
 
         <div class="flex shrink-0 items-center gap-2 sm:gap-3">
-          <div v-if="canEdit" class="hidden items-center gap-3 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs dark:border-zinc-800 sm:flex">
-            <div>
+          <div class="hidden items-center gap-x-2 rounded-lg border border-zinc-200 px-3 py-1.5 text-xs dark:border-zinc-800 sm:flex">
+            <template v-if="canEdit">
               <span class="text-zinc-400">PnL</span>
-              <span :class="['ml-1.5 font-semibold tabular-nums', totalClass]">
-                {{ totalPnl >= 0 ? '+' : '' }}{{ totalPnl.toFixed(1) }}
+              <span :class="['font-semibold tabular-nums', totalClass]">
+                {{ formatSigned(totalPnl) }}
               </span>
-            </div>
-            <div class="h-4 w-px bg-zinc-200 dark:bg-zinc-700" />
-            <div>
-              <span class="text-zinc-400">Win</span>
-              <span class="ml-1.5 font-semibold tabular-nums">{{ winCount }}/{{ statsEntries.length }}</span>
-            </div>
-          </div>
-          <div
-            v-else
-            class="hidden items-center rounded-lg border border-zinc-200 px-3 py-1.5 text-xs dark:border-zinc-800 sm:flex"
-          >
+              <span class="text-zinc-300 dark:text-zinc-600">/</span>
+            </template>
+            <span class="text-zinc-400">Total R:R real</span>
+            <span :class="['font-semibold tabular-nums', rrRealityClass]">
+              {{ formatSigned(totalRrReality) }}
+            </span>
+            <span class="text-zinc-300 dark:text-zinc-600">/</span>
             <span class="text-zinc-400">Win</span>
-            <span class="ml-1.5 font-semibold tabular-nums">{{ winCount }}/{{ statsEntries.length }}</span>
+            <span class="font-semibold tabular-nums">{{ winSummary }}</span>
           </div>
 
           <button
@@ -164,17 +178,21 @@ async function onLogout() {
         </div>
       </div>
 
-      <div class="flex items-center gap-4 border-t border-zinc-100 px-4 py-2 text-xs dark:border-zinc-800/80 sm:hidden">
-        <div v-if="canEdit">
-          <span class="text-zinc-400">PnL </span>
+      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-zinc-100 px-4 py-2 text-xs dark:border-zinc-800/80 sm:hidden">
+        <template v-if="canEdit">
+          <span class="text-zinc-400">PnL</span>
           <span :class="['font-semibold tabular-nums', totalClass]">
-            {{ totalPnl >= 0 ? '+' : '' }}{{ totalPnl.toFixed(1) }}
+            {{ formatSigned(totalPnl) }}
           </span>
-        </div>
-        <div>
-          <span class="text-zinc-400">Win </span>
-          <span class="font-semibold tabular-nums">{{ winCount }}/{{ statsEntries.length }}</span>
-        </div>
+          <span class="text-zinc-300 dark:text-zinc-600">/</span>
+        </template>
+        <span class="text-zinc-400">R:R real</span>
+        <span :class="['font-semibold tabular-nums', rrRealityClass]">
+          {{ formatSigned(totalRrReality) }}
+        </span>
+        <span class="text-zinc-300 dark:text-zinc-600">/</span>
+        <span class="text-zinc-400">Win</span>
+        <span class="font-semibold tabular-nums">{{ winSummary }}</span>
       </div>
     </header>
 
