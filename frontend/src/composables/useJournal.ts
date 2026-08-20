@@ -1,8 +1,7 @@
 import { ref, computed, watch, onMounted, type MaybeRefOrGetter, toValue } from 'vue'
-import type { JournalEntry, SortDirection, SortField } from '@/types/journal'
+import type { ImageSlot, JournalEntry, SortDirection, SortField, TradePayload } from '@/types/journal'
 import * as journalApi from '@/api/journal'
 import { getAuthToken } from '@/api/client'
-import { debounce } from '@/utils/debounce'
 import {
   getCurrentMonthRange,
   getCurrentWeekRange,
@@ -11,6 +10,8 @@ import {
 } from '@/utils/date'
 import { filterEntriesByDate, sortEntries, toggleSort } from '@/utils/entriesView'
 import { useAuth } from '@/composables/useAuth'
+
+export type SlotFiles = Record<ImageSlot, File[]>
 
 export function useJournal(slugSource: MaybeRefOrGetter<string>) {
   const { canEditSlug } = useAuth()
@@ -27,49 +28,9 @@ export function useJournal(slugSource: MaybeRefOrGetter<string>) {
   const sortField = ref<SortField>('date')
   const sortDirection = ref<SortDirection>('desc')
 
-  let skipSave = true
-  const saveTimers = new Map<number, ReturnType<typeof setTimeout>>()
-
   function currentSlug() {
     return toValue(slugSource)
   }
-
-  function queueSave(entry: JournalEntry) {
-    const slug = currentSlug()
-    if (skipSave || !entry.id || !getAuthToken() || !canEditSlug(slug)) return
-
-    const existing = saveTimers.get(entry.id)
-    if (existing) clearTimeout(existing)
-
-    saveTimers.set(
-      entry.id,
-      setTimeout(async () => {
-        try {
-          const updated = await journalApi.updateEntry(slug, entry.id, entry)
-          const idx = entries.value.findIndex((e) => e.id === entry.id)
-          if (idx === -1) return
-          const current = entries.value[idx]!
-          entries.value[idx] = {
-            ...current,
-            ...updated,
-            images: updated.images,
-          }
-          await refreshPairs()
-          await refreshTags()
-        } catch (e) {
-          error.value = e instanceof Error ? e.message : 'Lỗi lưu dữ liệu'
-        } finally {
-          saveTimers.delete(entry.id)
-        }
-      }, 500),
-    )
-  }
-
-  const debouncedQueueAll = debounce(() => {
-    for (const entry of entries.value) queueSave(entry)
-  }, 300)
-
-  watch(entries, debouncedQueueAll, { deep: true })
 
   async function refreshTags() {
     try {
@@ -87,10 +48,15 @@ export function useJournal(slugSource: MaybeRefOrGetter<string>) {
     }
   }
 
+  function replaceEntry(updated: JournalEntry) {
+    const idx = entries.value.findIndex((e) => e.id === updated.id)
+    if (idx === -1) entries.value.unshift(updated)
+    else entries.value[idx] = updated
+  }
+
   async function loadEntries() {
     loading.value = true
     error.value = null
-    skipSave = true
     try {
       const slug = currentSlug()
       const [data, pairs, tags] = await Promise.all([
@@ -106,9 +72,6 @@ export function useJournal(slugSource: MaybeRefOrGetter<string>) {
       entries.value = []
     } finally {
       loading.value = false
-      setTimeout(() => {
-        skipSave = false
-      }, 100)
     }
   }
 
@@ -116,6 +79,12 @@ export function useJournal(slugSource: MaybeRefOrGetter<string>) {
     if (pnl == null || pnl === '') return 0
     const n = Number(pnl)
     return Number.isFinite(n) ? n : 0
+  }
+
+  function isWin(entry: JournalEntry): boolean {
+    if (entry.result === 'Take profit') return true
+    if (entry.result === 'Stop loss' || entry.result === 'BE') return false
+    return pnlValue(entry.pnl) > 0
   }
 
   const visibleEntries = computed(() => {
@@ -129,13 +98,11 @@ export function useJournal(slugSource: MaybeRefOrGetter<string>) {
     statsEntries.value.reduce((sum, e) => sum + pnlValue(e.pnl), 0),
   )
 
-  const totalRrReality = computed(() =>
-    statsEntries.value.reduce((sum, e) => sum + pnlValue(e.rrReality), 0),
+  const totalRrReal = computed(() =>
+    statsEntries.value.reduce((sum, e) => sum + pnlValue(e.rrReal), 0),
   )
 
-  const winCount = computed(() =>
-    statsEntries.value.filter((e) => pnlValue(e.pnl) > 0).length,
-  )
+  const winCount = computed(() => statsEntries.value.filter(isWin).length)
 
   const winRate = computed(() => {
     const total = statsEntries.value.length
@@ -173,11 +140,6 @@ export function useJournal(slugSource: MaybeRefOrGetter<string>) {
     dateTo.value = range.to
   }
 
-  const allTagSuggestions = computed(() => {
-    const fromEntries = entries.value.flatMap((e) => e.tags.map((t) => t.trim().toUpperCase()))
-    return [...new Set([...tagSuggestions.value, ...fromEntries])]
-  })
-
   const allPairSuggestions = computed(() => {
     const fromEntries = entries.value
       .map((e) => e.pair.trim().toUpperCase())
@@ -185,16 +147,72 @@ export function useJournal(slugSource: MaybeRefOrGetter<string>) {
     return [...new Set([...pairSuggestions.value, ...fromEntries])]
   })
 
-  async function addEntry() {
+  const allTagSuggestions = computed(() => {
+    const fromEntries = entries.value.flatMap((e) => e.tags.map((t) => t.trim().toUpperCase()))
+    return [...new Set([...tagSuggestions.value, ...fromEntries])]
+  })
+
+  async function uploadSlotFiles(entryId: number, files: SlotFiles) {
     const slug = currentSlug()
-    if (!canEditSlug(slug)) return
+    let latest: JournalEntry | null = null
+    for (const slot of ['htf', 'mtf', 'ltf'] as const) {
+      for (const file of files[slot]) {
+        latest = await journalApi.uploadImage(slug, entryId, file, slot)
+      }
+    }
+    return latest
+  }
+
+  async function saveTrade(
+    payload: Partial<TradePayload>,
+    files: SlotFiles = { htf: [], mtf: [], ltf: [] },
+    options: { id?: number; removedImageIds?: number[] } = {},
+  ) {
+    const slug = currentSlug()
+    if (!canEditSlug(slug) || !getAuthToken()) return null
+
     try {
-      const entry = await journalApi.createEntry(slug)
-      entries.value.unshift(entry)
+      let entry: JournalEntry
+      if (options.id) {
+        entry = await journalApi.updateEntry(slug, options.id, payload)
+        for (const imageId of options.removedImageIds ?? []) {
+          entry = await journalApi.deleteImage(slug, options.id, imageId)
+        }
+      } else {
+        entry = await journalApi.createEntry(slug, payload)
+      }
+
+      replaceEntry(entry)
+
+      try {
+        const uploaded = await uploadSlotFiles(entry.id, files)
+        if (uploaded) {
+          entry = uploaded
+          replaceEntry(entry)
+        }
+      } catch (e) {
+        error.value = e instanceof Error ? e.message : 'Đã lưu giao dịch nhưng không tải được một số ảnh'
+      }
+
       await refreshPairs()
       await refreshTags()
+      return entry
     } catch (e) {
-      error.value = e instanceof Error ? e.message : 'Không thêm được dòng'
+      error.value = e instanceof Error ? e.message : 'Không lưu được giao dịch'
+      throw e
+    }
+  }
+
+  async function setVisible(id: number, visible: boolean) {
+    const slug = currentSlug()
+    if (!canEditSlug(slug)) return
+    const current = entries.value.find((e) => e.id === id)
+    if (!current) return
+    try {
+      const updated = await journalApi.updateEntry(slug, id, { ...current, visible })
+      replaceEntry(updated)
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : 'Không cập nhật được hiển thị'
     }
   }
 
@@ -220,22 +238,6 @@ export function useJournal(slugSource: MaybeRefOrGetter<string>) {
     } catch (e) {
       error.value = e instanceof Error ? e.message : 'Không xóa được dòng'
     }
-  }
-
-  async function uploadImage(entryId: number, file: File) {
-    const slug = currentSlug()
-    if (!canEditSlug(slug)) return
-    const updated = await journalApi.uploadImage(slug, entryId, file)
-    const idx = entries.value.findIndex((e) => e.id === entryId)
-    if (idx !== -1) entries.value[idx] = updated
-  }
-
-  async function removeImage(entryId: number, imageId: number) {
-    const slug = currentSlug()
-    if (!canEditSlug(slug)) return
-    const updated = await journalApi.deleteImage(slug, entryId, imageId)
-    const idx = entries.value.findIndex((e) => e.id === entryId)
-    if (idx !== -1) entries.value[idx] = updated
   }
 
   watch(
@@ -265,13 +267,12 @@ export function useJournal(slugSource: MaybeRefOrGetter<string>) {
     loading,
     error,
     totalPnl,
-    totalRrReality,
+    totalRrReal,
     winCount,
     winRate,
-    addEntry,
+    saveTrade,
+    setVisible,
     removeEntry,
-    uploadImage,
-    removeImage,
     reload: loadEntries,
   }
 }

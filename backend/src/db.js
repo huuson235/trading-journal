@@ -9,6 +9,44 @@ const stores = new Map()
 const BG_SETTINGS_KEY = 'background'
 export const DEFAULT_BACKGROUND = { type: 'default' }
 
+const IMAGE_SLOTS = ['htf', 'mtf', 'ltf']
+const SESSIONS = ['London', 'Asia', 'New York AM', 'New York PM', 'No session']
+const RESULTS = ['Take profit', 'Stop loss', 'BE']
+const CTC_VALUES = ['bullish', 'bearish', 'sideways']
+const BIAS_VALUES = ['bullish', 'bearish', 'no_bias']
+const MTF_MODELS = ['CRT', 'I-E', 'E-E', 'Unicorn']
+
+const SESSION_ALIASES = {
+  Asia: 'Asia',
+  London: 'London',
+  NYA: 'New York AM',
+  NYL: 'New York PM',
+  NYP: 'New York PM',
+  'New York AM': 'New York AM',
+  'New York PM': 'New York PM',
+  'No session': 'No session',
+}
+
+const NEW_ENTRY_COLUMNS = [
+  ['rr_idea', 'REAL'],
+  ['rr_real', 'REAL'],
+  ['result', "TEXT NOT NULL DEFAULT ''"],
+  ['htf_ctc', "TEXT NOT NULL DEFAULT ''"],
+  ['htf_bias', "TEXT NOT NULL DEFAULT ''"],
+  ['htf_pda', "TEXT NOT NULL DEFAULT ''"],
+  ['htf_dol', "TEXT NOT NULL DEFAULT ''"],
+  ['mtf_ctc', "TEXT NOT NULL DEFAULT ''"],
+  ['mtf_pda', "TEXT NOT NULL DEFAULT ''"],
+  ['mtf_model', "TEXT NOT NULL DEFAULT ''"],
+  ['mtf_sweep', 'INTEGER NOT NULL DEFAULT 0'],
+  ['mtf_cisd', 'INTEGER NOT NULL DEFAULT 0'],
+  ['mtf_mss', 'INTEGER NOT NULL DEFAULT 0'],
+  ['ltf_sweep', 'INTEGER NOT NULL DEFAULT 0'],
+  ['ltf_cisd', 'INTEGER NOT NULL DEFAULT 0'],
+  ['ltf_mss', 'INTEGER NOT NULL DEFAULT 0'],
+  ['ltf_entry', "TEXT NOT NULL DEFAULT ''"],
+]
+
 function normalizeTag(value) {
   return String(value ?? '').trim().toUpperCase()
 }
@@ -47,6 +85,42 @@ function normalizeDirection(value) {
   return value === 'SHORT' ? 'SHORT' : 'LONG'
 }
 
+function normalizeBool(value) {
+  return value === true || value === 1 || value === '1' || value === 'true'
+}
+
+function pickAllowed(value, allowed) {
+  const raw = String(value ?? '').trim()
+  if (!raw) return ''
+  const found = allowed.find((item) => item.toLowerCase() === raw.toLowerCase())
+  return found ?? ''
+}
+
+function normalizeSession(value) {
+  const raw = String(value ?? '').trim()
+  if (!raw) return 'No session'
+  if (SESSION_ALIASES[raw]) return SESSION_ALIASES[raw]
+  const found = SESSIONS.find((item) => item.toLowerCase() === raw.toLowerCase())
+  return found ?? 'No session'
+}
+
+function normalizeResult(value) {
+  return pickAllowed(value, RESULTS)
+}
+
+function normalizeSlot(value) {
+  const slot = String(value ?? '').trim().toLowerCase()
+  return IMAGE_SLOTS.includes(slot) ? slot : 'htf'
+}
+
+function inferResultFromPnl(pnl) {
+  const n = normalizeNumber(pnl)
+  if (n == null) return ''
+  if (n > 0) return 'Take profit'
+  if (n < 0) return 'Stop loss'
+  return 'BE'
+}
+
 function createJournalStore(slug) {
   const dataDir = userDataDir(slug)
   const uploadsDir = userUploadsDir(slug)
@@ -66,8 +140,11 @@ function createJournalStore(slug) {
       rr REAL,
       rr_plan REAL,
       rr_reality REAL,
+      rr_idea REAL,
+      rr_real REAL,
       checklist INTEGER NOT NULL DEFAULT 0,
       pnl REAL,
+      result TEXT NOT NULL DEFAULT '',
       note TEXT NOT NULL DEFAULT '',
       tags TEXT NOT NULL DEFAULT '[]',
       visible INTEGER NOT NULL DEFAULT 1,
@@ -77,6 +154,20 @@ function createJournalStore(slug) {
       htf_image TEXT,
       mtf_image TEXT,
       ltf_image TEXT,
+      htf_ctc TEXT NOT NULL DEFAULT '',
+      htf_bias TEXT NOT NULL DEFAULT '',
+      htf_pda TEXT NOT NULL DEFAULT '',
+      htf_dol TEXT NOT NULL DEFAULT '',
+      mtf_ctc TEXT NOT NULL DEFAULT '',
+      mtf_pda TEXT NOT NULL DEFAULT '',
+      mtf_model TEXT NOT NULL DEFAULT '',
+      mtf_sweep INTEGER NOT NULL DEFAULT 0,
+      mtf_cisd INTEGER NOT NULL DEFAULT 0,
+      mtf_mss INTEGER NOT NULL DEFAULT 0,
+      ltf_sweep INTEGER NOT NULL DEFAULT 0,
+      ltf_cisd INTEGER NOT NULL DEFAULT 0,
+      ltf_mss INTEGER NOT NULL DEFAULT 0,
+      ltf_entry TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
@@ -94,6 +185,7 @@ function createJournalStore(slug) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       entry_id INTEGER NOT NULL,
       filename TEXT NOT NULL,
+      slot TEXT NOT NULL DEFAULT 'htf',
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (entry_id) REFERENCES journal_entries(id) ON DELETE CASCADE
@@ -121,6 +213,17 @@ function createJournalStore(slug) {
       db.exec('ALTER TABLE journal_entries ADD COLUMN checklist INTEGER NOT NULL DEFAULT 0')
     }
 
+    for (const [name, ddl] of NEW_ENTRY_COLUMNS) {
+      if (!cols.includes(name)) {
+        db.exec(`ALTER TABLE journal_entries ADD COLUMN ${name} ${ddl}`)
+      }
+    }
+
+    const imageCols = db.prepare('PRAGMA table_info(entry_images)').all().map((c) => c.name)
+    if (!imageCols.includes('slot')) {
+      db.exec("ALTER TABLE entry_images ADD COLUMN slot TEXT NOT NULL DEFAULT 'htf'")
+    }
+
     const rrSplit = db.prepare("SELECT value FROM settings WHERE key = 'rr_plan_reality_split'").get()
     if (!rrSplit) {
       db.prepare(`
@@ -136,11 +239,10 @@ function createJournalStore(slug) {
 
     const migrated = db.prepare("SELECT value FROM settings WHERE key = 'images_migrated'").get()
     if (!migrated) {
-      const slots = ['htf', 'mtf', 'ltf']
       const rows = db.prepare('SELECT * FROM journal_entries').all()
       for (const row of rows) {
         let order = 0
-        for (const slot of slots) {
+        for (const slot of IMAGE_SLOTS) {
           const filename = row[`${slot}_image`]
           if (filename) {
             const exists = db
@@ -148,8 +250,8 @@ function createJournalStore(slug) {
               .get(row.id, filename)
             if (!exists) {
               db.prepare(
-                'INSERT INTO entry_images (entry_id, filename, sort_order) VALUES (?, ?, ?)',
-              ).run(row.id, filename, order++)
+                'INSERT INTO entry_images (entry_id, filename, slot, sort_order) VALUES (?, ?, ?, ?)',
+              ).run(row.id, filename, slot, order++)
             }
           }
         }
@@ -192,7 +294,6 @@ function createJournalStore(slug) {
       const update = db.prepare('UPDATE journal_entries SET note = ? WHERE id = ?')
       for (const row of rows) {
         const tag = SESSION_TO_TAG[row.session] ?? 'ASIA'
-        // Before note/tags split, tags live in `note`
         const tags = parseTags(row.note)
         if (tags.includes(tag)) continue
         update.run(serializeTags([...tags, tag]), row.id)
@@ -203,7 +304,6 @@ function createJournalStore(slug) {
       `).run()
     }
 
-    // Split: tags JSON moved out of `note`; `note` becomes free-text memo
     const noteTagsSplit = db
       .prepare("SELECT value FROM settings WHERE key = 'note_tags_split'")
       .get()
@@ -221,6 +321,41 @@ function createJournalStore(slug) {
         ON CONFLICT(key) DO UPDATE SET value = excluded.value
       `).run()
     }
+
+    const tradeFormMigrated = db
+      .prepare("SELECT value FROM settings WHERE key = 'trade_form_v1'")
+      .get()
+    if (!tradeFormMigrated) {
+      const rows = db.prepare('SELECT * FROM journal_entries').all()
+      const update = db.prepare(`
+        UPDATE journal_entries SET
+          session = ?, rr_idea = ?, rr_real = ?, result = ?, ltf_entry = ?
+        WHERE id = ?
+      `)
+      const updateSlot = db.prepare(
+        'UPDATE entry_images SET slot = ? WHERE entry_id = ? AND filename = ?',
+      )
+
+      for (const row of rows) {
+        const rrIdea = normalizeNumber(row.rr_idea ?? row.rr_plan ?? row.rr)
+        const rrReal = normalizeNumber(row.rr_real ?? row.rr_reality)
+        const result = String(row.result ?? '').trim()
+          ? normalizeResult(row.result)
+          : inferResultFromPnl(row.pnl)
+        const ltfEntry = String(row.ltf_entry ?? '').trim() || String(row.ltf_text ?? '')
+        update.run(normalizeSession(row.session), rrIdea, rrReal, result, ltfEntry, row.id)
+
+        for (const slot of IMAGE_SLOTS) {
+          const filename = row[`${slot}_image`]
+          if (filename) updateSlot.run(slot, row.id, filename)
+        }
+      }
+
+      db.prepare(`
+        INSERT INTO settings (key, value) VALUES ('trade_form_v1', '1')
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+      `).run()
+    }
   }
 
   migrate()
@@ -229,42 +364,79 @@ function createJournalStore(slug) {
     return `/uploads/${slug}/${filename}`
   }
 
+  function toImage(row) {
+    return {
+      id: row.id,
+      slot: normalizeSlot(row.slot),
+      imageUrl: uploadUrl(row.filename),
+      thumbUrl: resolveThumbUrl(uploadsDir, row.filename, slug),
+    }
+  }
+
   function loadImages(entryId) {
     const rows = db
       .prepare(
-        'SELECT id, filename FROM entry_images WHERE entry_id = ? ORDER BY sort_order ASC, id ASC',
+        'SELECT id, filename, slot FROM entry_images WHERE entry_id = ? ORDER BY sort_order ASC, id ASC',
       )
       .all(entryId)
-    return rows.map((row) => ({
-      id: row.id,
-      imageUrl: uploadUrl(row.filename),
-      thumbUrl: resolveThumbUrl(uploadsDir, row.filename, slug),
-    }))
+    return rows.map(toImage)
+  }
+
+  function groupImages(images) {
+    const grouped = { htf: [], mtf: [], ltf: [] }
+    for (const image of images) {
+      const slot = normalizeSlot(image.slot)
+      grouped[slot].push(image)
+    }
+    return grouped
   }
 
   function rowToEntry(row) {
-    const rrPlan = normalizeNumber(row.rr_plan ?? row.rr)
+    const images = loadImages(row.id)
+    const grouped = groupImages(images)
+    const rrIdea = normalizeNumber(row.rr_idea ?? row.rr_plan ?? row.rr)
+    const rrReal = normalizeNumber(row.rr_real ?? row.rr_reality)
     return {
       id: row.id,
       no: row.no,
       date: row.date,
       createdAt: row.created_at,
-      session: row.session,
-      pair: row.pair,
+      session: normalizeSession(row.session),
+      pair: String(row.pair ?? '').toUpperCase(),
       direction: normalizeDirection(row.direction),
-      rrPlan,
-      rrReality: normalizeNumber(row.rr_reality),
+      rrIdea,
+      rrReal,
+      rrPlan: rrIdea,
+      rrReality: rrReal,
       checklist: Boolean(row.checklist ?? 0),
       pnl: normalizeNumber(row.pnl),
+      result: normalizeResult(row.result),
       note: String(row.note ?? ''),
       tags: parseTags(row.tags),
       visible: Boolean(row.visible ?? 1),
-      images: loadImages(row.id),
+      htfCtc: pickAllowed(row.htf_ctc, CTC_VALUES),
+      htfBias: pickAllowed(row.htf_bias, BIAS_VALUES),
+      htfPda: String(row.htf_pda ?? ''),
+      htfDol: String(row.htf_dol ?? ''),
+      mtfCtc: pickAllowed(row.mtf_ctc, CTC_VALUES),
+      mtfPda: String(row.mtf_pda ?? ''),
+      mtfModel: pickAllowed(row.mtf_model, MTF_MODELS),
+      mtfSweep: Boolean(row.mtf_sweep ?? 0),
+      mtfCisd: Boolean(row.mtf_cisd ?? 0),
+      mtfMss: Boolean(row.mtf_mss ?? 0),
+      ltfSweep: Boolean(row.ltf_sweep ?? 0),
+      ltfCisd: Boolean(row.ltf_cisd ?? 0),
+      ltfMss: Boolean(row.ltf_mss ?? 0),
+      ltfEntry: String(row.ltf_entry ?? ''),
+      htfImages: grouped.htf,
+      mtfImages: grouped.mtf,
+      ltfImages: grouped.ltf,
+      images,
     }
   }
 
   function removeLegacyImages(row) {
-    for (const slot of ['htf', 'mtf', 'ltf']) {
+    for (const slot of IMAGE_SLOTS) {
       const filename = row[`${slot}_image`]
       if (filename) removeImageFiles(uploadsDir, filename)
     }
@@ -280,6 +452,44 @@ function createJournalStore(slug) {
     } catch (e) {
       db.exec('ROLLBACK')
       throw e
+    }
+  }
+
+  function buildWriteValues(data, existing) {
+    const rrIdea = normalizeNumber(data.rrIdea ?? data.rrPlan ?? data.rr)
+    const rrReal = normalizeNumber(
+      data.rrReal !== undefined ? data.rrReal : data.rrReality !== undefined ? data.rrReality : existing?.rrReal,
+    )
+    const pnl = data.pnl !== undefined ? normalizeNumber(data.pnl) : existing ? existing.pnl : null
+    const resultSource =
+      data.result !== undefined ? data.result : existing ? existing.result : ''
+    return {
+      date: data.date ?? existing?.date,
+      session: normalizeSession(data.session ?? existing?.session),
+      pair: String(data.pair ?? existing?.pair ?? '').trim().toUpperCase(),
+      direction: normalizeDirection(data.direction ?? existing?.direction),
+      rrIdea,
+      rrReal,
+      checklist: data.checklist !== undefined ? normalizeBool(data.checklist) : Boolean(existing?.checklist),
+      pnl,
+      result: normalizeResult(resultSource),
+      note: data.note !== undefined ? String(data.note ?? '') : String(existing?.note ?? ''),
+      tags: data.tags !== undefined ? serializeTags(data.tags) : serializeTags(existing?.tags ?? []),
+      visible: data.visible !== undefined ? data.visible !== false : existing ? existing.visible !== false : true,
+      htfCtc: pickAllowed(data.htfCtc ?? existing?.htfCtc, CTC_VALUES),
+      htfBias: pickAllowed(data.htfBias ?? existing?.htfBias, BIAS_VALUES),
+      htfPda: String(data.htfPda ?? existing?.htfPda ?? ''),
+      htfDol: String(data.htfDol ?? existing?.htfDol ?? ''),
+      mtfCtc: pickAllowed(data.mtfCtc ?? existing?.mtfCtc, CTC_VALUES),
+      mtfPda: String(data.mtfPda ?? existing?.mtfPda ?? ''),
+      mtfModel: pickAllowed(data.mtfModel ?? existing?.mtfModel, MTF_MODELS),
+      mtfSweep: normalizeBool(data.mtfSweep ?? existing?.mtfSweep),
+      mtfCisd: normalizeBool(data.mtfCisd ?? existing?.mtfCisd),
+      mtfMss: normalizeBool(data.mtfMss ?? existing?.mtfMss),
+      ltfSweep: normalizeBool(data.ltfSweep ?? existing?.ltfSweep),
+      ltfCisd: normalizeBool(data.ltfCisd ?? existing?.ltfCisd),
+      ltfMss: normalizeBool(data.ltfMss ?? existing?.ltfMss),
+      ltfEntry: String(data.ltfEntry ?? existing?.ltfEntry ?? ''),
     }
   }
 
@@ -302,60 +512,98 @@ function createJournalStore(slug) {
 
     createEntry(data) {
       const maxNo = db.prepare('SELECT COALESCE(MAX(no), 0) as m FROM journal_entries').get().m
-      const rrPlan = normalizeNumber(data.rrPlan ?? data.rr)
+      const values = buildWriteValues(data, null)
       const stmt = db.prepare(`
         INSERT INTO journal_entries (
-          no, date, session, pair, direction, rr, rr_plan, rr_reality, checklist, pnl, note, tags, visible
+          no, date, session, pair, direction, rr, rr_plan, rr_reality, rr_idea, rr_real,
+          checklist, pnl, result, note, tags, visible,
+          htf_ctc, htf_bias, htf_pda, htf_dol,
+          mtf_ctc, mtf_pda, mtf_model, mtf_sweep, mtf_cisd, mtf_mss,
+          ltf_sweep, ltf_cisd, ltf_mss, ltf_entry
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       const result = stmt.run(
         maxNo + 1,
-        data.date,
-        data.session,
-        data.pair ?? '',
-        normalizeDirection(data.direction),
-        rrPlan,
-        rrPlan,
-        normalizeNumber(data.rrReality),
-        data.checklist === true ? 1 : 0,
-        normalizeNumber(data.pnl),
-        String(data.note ?? ''),
-        serializeTags(data.tags ?? []),
-        data.visible === false ? 0 : 1,
+        values.date,
+        values.session,
+        values.pair,
+        values.direction,
+        values.rrIdea,
+        values.rrIdea,
+        values.rrReal,
+        values.rrIdea,
+        values.rrReal,
+        values.checklist ? 1 : 0,
+        values.pnl,
+        values.result,
+        values.note,
+        values.tags,
+        values.visible ? 1 : 0,
+        values.htfCtc,
+        values.htfBias,
+        values.htfPda,
+        values.htfDol,
+        values.mtfCtc,
+        values.mtfPda,
+        values.mtfModel,
+        values.mtfSweep ? 1 : 0,
+        values.mtfCisd ? 1 : 0,
+        values.mtfMss ? 1 : 0,
+        values.ltfSweep ? 1 : 0,
+        values.ltfCisd ? 1 : 0,
+        values.ltfMss ? 1 : 0,
+        values.ltfEntry,
       )
       return this.getEntryById(Number(result.lastInsertRowid))
     },
 
     updateEntry(id, data) {
-      const existing = db.prepare('SELECT id, note, tags FROM journal_entries WHERE id = ?').get(id)
+      const existing = this.getEntryById(id)
       if (!existing) return null
 
-      const tagsValue =
-        data.tags !== undefined ? serializeTags(data.tags) : existing.tags ?? '[]'
-      const noteValue = data.note !== undefined ? String(data.note ?? '') : existing.note ?? ''
-      const rrPlan = normalizeNumber(data.rrPlan ?? data.rr)
+      const values = buildWriteValues(data, existing)
 
       db.prepare(`
         UPDATE journal_entries SET
           date = ?, session = ?, pair = ?, direction = ?,
-          rr = ?, rr_plan = ?, rr_reality = ?, checklist = ?,
-          pnl = ?, note = ?, tags = ?, visible = ?,
+          rr = ?, rr_plan = ?, rr_reality = ?, rr_idea = ?, rr_real = ?,
+          checklist = ?, pnl = ?, result = ?, note = ?, tags = ?, visible = ?,
+          htf_ctc = ?, htf_bias = ?, htf_pda = ?, htf_dol = ?,
+          mtf_ctc = ?, mtf_pda = ?, mtf_model = ?, mtf_sweep = ?, mtf_cisd = ?, mtf_mss = ?,
+          ltf_sweep = ?, ltf_cisd = ?, ltf_mss = ?, ltf_entry = ?,
           updated_at = datetime('now')
         WHERE id = ?
       `).run(
-        data.date,
-        data.session,
-        data.pair ?? '',
-        normalizeDirection(data.direction),
-        rrPlan,
-        rrPlan,
-        normalizeNumber(data.rrReality),
-        data.checklist === true ? 1 : 0,
-        normalizeNumber(data.pnl),
-        noteValue,
-        tagsValue,
-        data.visible === false ? 0 : 1,
+        values.date,
+        values.session,
+        values.pair,
+        values.direction,
+        values.rrIdea,
+        values.rrIdea,
+        values.rrReal,
+        values.rrIdea,
+        values.rrReal,
+        values.checklist ? 1 : 0,
+        values.pnl,
+        values.result,
+        values.note,
+        values.tags,
+        values.visible ? 1 : 0,
+        values.htfCtc,
+        values.htfBias,
+        values.htfPda,
+        values.htfDol,
+        values.mtfCtc,
+        values.mtfPda,
+        values.mtfModel,
+        values.mtfSweep ? 1 : 0,
+        values.mtfCisd ? 1 : 0,
+        values.mtfMss ? 1 : 0,
+        values.ltfSweep ? 1 : 0,
+        values.ltfCisd ? 1 : 0,
+        values.ltfMss ? 1 : 0,
+        values.ltfEntry,
         id,
       )
       return this.getEntryById(id)
@@ -377,17 +625,20 @@ function createJournalStore(slug) {
       return true
     },
 
-    addEntryImage(entryId, filename) {
+    addEntryImage(entryId, filename, slot = 'htf') {
       const row = db.prepare('SELECT id FROM journal_entries WHERE id = ?').get(entryId)
       if (!row) return null
 
+      const normalizedSlot = normalizeSlot(slot)
       const maxOrder = db
-        .prepare('SELECT COALESCE(MAX(sort_order), -1) as m FROM entry_images WHERE entry_id = ?')
-        .get(entryId).m
+        .prepare(
+          'SELECT COALESCE(MAX(sort_order), -1) as m FROM entry_images WHERE entry_id = ? AND slot = ?',
+        )
+        .get(entryId, normalizedSlot).m
 
       db.prepare(
-        'INSERT INTO entry_images (entry_id, filename, sort_order) VALUES (?, ?, ?)',
-      ).run(entryId, filename, maxOrder + 1)
+        'INSERT INTO entry_images (entry_id, filename, slot, sort_order) VALUES (?, ?, ?, ?)',
+      ).run(entryId, filename, normalizedSlot, maxOrder + 1)
 
       return this.getEntryById(entryId)
     },

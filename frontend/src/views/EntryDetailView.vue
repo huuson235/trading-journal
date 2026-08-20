@@ -4,7 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { fetchEntry } from '@/api/journal'
 import ImageLightbox from '@/components/ImageLightbox.vue'
 import { useAuth } from '@/composables/useAuth'
-import type { JournalEntry } from '@/types/journal'
+import type { EntryImage, JournalEntry } from '@/types/journal'
 import { isoToDisplay } from '@/utils/date'
 import { getTagClass } from '@/utils/tagStyles'
 
@@ -17,8 +17,7 @@ const error = ref<string | null>(null)
 const copied = ref(false)
 const lightboxIndex = ref(0)
 const showLightbox = ref(false)
-
-const imageUrls = computed(() => entry.value?.images.map((img) => img.imageUrl) ?? [])
+const lightboxSources = ref<string[]>([])
 
 const journalSlug = computed(() => String(route.params.slug ?? ''))
 const entryId = computed(() => Number(route.params.id))
@@ -35,6 +34,13 @@ function pnlClass(pnl: number | null) {
   return pnl > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
 }
 
+function resultClass(result: string) {
+  if (result === 'Take profit') return 'bg-emerald-600 text-white'
+  if (result === 'Stop loss') return 'bg-rose-600 text-white'
+  if (result === 'BE') return 'bg-zinc-700 text-white'
+  return 'bg-zinc-200 text-zinc-600'
+}
+
 function formatPnl(pnl: number | null) {
   if (pnl == null) return '—'
   return `${pnl >= 0 ? '+' : ''}${pnl}`
@@ -43,6 +49,20 @@ function formatPnl(pnl: number | null) {
 function formatRr(rr: number | null) {
   if (rr == null) return '—'
   return String(rr)
+}
+
+function formatFlag(value: string) {
+  if (value === 'bullish') return 'Bullish'
+  if (value === 'bearish') return 'Bearish'
+  if (value === 'sideways') return 'Sideways'
+  if (value === 'no_bias') return 'No bias'
+  return value || '—'
+}
+
+function openImages(images: EntryImage[], index: number) {
+  lightboxSources.value = images.map((img) => img.imageUrl)
+  lightboxIndex.value = index
+  showLightbox.value = true
 }
 
 async function loadEntry() {
@@ -130,6 +150,14 @@ watch([entryId, journalSlug], loadEntry)
               #{{ entry.no }}
             </span>
             <span class="text-xs text-zinc-400">{{ isoToDisplay(entry.date) }}</span>
+            <span v-if="entry.session" class="text-xs text-zinc-500">{{ entry.session }}</span>
+            <span
+              v-if="entry.result"
+              class="rounded-full px-2 py-0.5 text-[10px] font-medium"
+              :class="resultClass(entry.result)"
+            >
+              {{ entry.result }}
+            </span>
           </div>
 
           <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">
@@ -138,16 +166,12 @@ watch([entryId, journalSlug], loadEntry)
 
           <div class="flex flex-wrap gap-3">
             <div class="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
-              <div class="text-[10px] font-medium uppercase tracking-wide text-zinc-400">R:R plan</div>
-              <div class="mt-0.5 text-xl font-semibold tabular-nums">{{ formatRr(entry.rrPlan) }}</div>
+              <div class="text-[10px] font-medium uppercase tracking-wide text-zinc-400">RR idea</div>
+              <div class="mt-0.5 text-xl font-semibold tabular-nums">{{ formatRr(entry.rrIdea) }}</div>
             </div>
             <div class="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
-              <div class="text-[10px] font-medium uppercase tracking-wide text-zinc-400">R:R reality</div>
-              <div class="mt-0.5 text-xl font-semibold tabular-nums">{{ formatRr(entry.rrReality) }}</div>
-            </div>
-            <div class="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
-              <div class="text-[10px] font-medium uppercase tracking-wide text-zinc-400">Checklist</div>
-              <div class="mt-0.5 text-xl font-semibold">{{ entry.checklist ? '✓' : '—' }}</div>
+              <div class="text-[10px] font-medium uppercase tracking-wide text-zinc-400">RR real</div>
+              <div class="mt-0.5 text-xl font-semibold tabular-nums">{{ formatRr(entry.rrReal) }}</div>
             </div>
             <div
               v-if="canSeePnl"
@@ -160,6 +184,107 @@ watch([entryId, journalSlug], loadEntry)
             </div>
           </div>
         </header>
+
+        <section
+          v-if="(entry.note ?? '').trim()"
+          class="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
+        >
+          <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">Note</h2>
+          <p class="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+            {{ entry.note }}
+          </p>
+        </section>
+
+        <section class="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#1976D2]">HTF</h2>
+          <dl class="mb-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+            <div>
+              <dt class="text-[10px] uppercase text-zinc-400">CTC</dt>
+              <dd>{{ formatFlag(entry.htfCtc) }}</dd>
+            </div>
+            <div>
+              <dt class="text-[10px] uppercase text-zinc-400">Bias</dt>
+              <dd>{{ formatFlag(entry.htfBias) }}</dd>
+            </div>
+            <div>
+              <dt class="text-[10px] uppercase text-zinc-400">PDA</dt>
+              <dd>{{ entry.htfPda || '—' }}</dd>
+            </div>
+            <div>
+              <dt class="text-[10px] uppercase text-zinc-400">DOL</dt>
+              <dd>{{ entry.htfDol || '—' }}</dd>
+            </div>
+          </dl>
+          <div v-if="entry.htfImages?.length" class="grid gap-3">
+            <button
+              v-for="(img, i) in entry.htfImages"
+              :key="img.id"
+              type="button"
+              class="block w-full cursor-zoom-in overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-950"
+              @click="openImages(entry.htfImages, i)"
+            >
+              <img :src="img.imageUrl" :alt="`HTF ${i + 1}`" class="mx-auto max-h-[50vh] w-full object-contain" />
+            </button>
+          </div>
+        </section>
+
+        <section class="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#1976D2]">MTF</h2>
+          <dl class="mb-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+            <div>
+              <dt class="text-[10px] uppercase text-zinc-400">CTC</dt>
+              <dd>{{ formatFlag(entry.mtfCtc) }}</dd>
+            </div>
+            <div>
+              <dt class="text-[10px] uppercase text-zinc-400">PDA</dt>
+              <dd>{{ entry.mtfPda || '—' }}</dd>
+            </div>
+            <div>
+              <dt class="text-[10px] uppercase text-zinc-400">Model</dt>
+              <dd>{{ entry.mtfModel || '—' }}</dd>
+            </div>
+            <div>
+              <dt class="text-[10px] uppercase text-zinc-400">Flags</dt>
+              <dd>{{ [entry.mtfSweep && 'Sweep', entry.mtfCisd && 'CISD', entry.mtfMss && 'MSS'].filter(Boolean).join(', ') || '—' }}</dd>
+            </div>
+          </dl>
+          <div v-if="entry.mtfImages?.length" class="grid gap-3">
+            <button
+              v-for="(img, i) in entry.mtfImages"
+              :key="img.id"
+              type="button"
+              class="block w-full cursor-zoom-in overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-950"
+              @click="openImages(entry.mtfImages, i)"
+            >
+              <img :src="img.imageUrl" :alt="`MTF ${i + 1}`" class="mx-auto max-h-[50vh] w-full object-contain" />
+            </button>
+          </div>
+        </section>
+
+        <section class="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
+          <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#1976D2]">LTF</h2>
+          <dl class="mb-4 grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <dt class="text-[10px] uppercase text-zinc-400">Flags</dt>
+              <dd>{{ [entry.ltfSweep && 'Sweep', entry.ltfCisd && 'CISD', entry.ltfMss && 'MSS'].filter(Boolean).join(', ') || '—' }}</dd>
+            </div>
+            <div class="col-span-2">
+              <dt class="text-[10px] uppercase text-zinc-400">Entry</dt>
+              <dd class="whitespace-pre-wrap">{{ entry.ltfEntry || '—' }}</dd>
+            </div>
+          </dl>
+          <div v-if="entry.ltfImages?.length" class="grid gap-3">
+            <button
+              v-for="(img, i) in entry.ltfImages"
+              :key="img.id"
+              type="button"
+              class="block w-full cursor-zoom-in overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-950"
+              @click="openImages(entry.ltfImages, i)"
+            >
+              <img :src="img.imageUrl" :alt="`LTF ${i + 1}`" class="mx-auto max-h-[50vh] w-full object-contain" />
+            </button>
+          </div>
+        </section>
 
         <section
           v-if="entry.tags.length > 0"
@@ -178,40 +303,6 @@ watch([entryId, journalSlug], loadEntry)
           </div>
         </section>
 
-        <section
-          v-if="(entry.note ?? '').trim()"
-          class="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
-        >
-          <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">Note</h2>
-          <p class="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
-            {{ entry.note }}
-          </p>
-        </section>
-
-        <section v-if="entry.images.length > 0" class="space-y-4">
-          <h2 class="text-xs font-semibold uppercase tracking-wide text-zinc-400">Charts</h2>
-          <div
-            v-for="(img, i) in entry.images"
-            :key="img.id"
-            class="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
-          >
-            <div class="bg-zinc-100 dark:bg-zinc-950">
-              <button
-                type="button"
-                class="block w-full cursor-zoom-in"
-                @click="lightboxIndex = i; showLightbox = true"
-              >
-                <img
-                  :src="img.imageUrl"
-                  :alt="`Chart ${i + 1}`"
-                  class="mx-auto max-h-[70vh] w-full object-contain"
-                  loading="lazy"
-                />
-              </button>
-            </div>
-          </div>
-        </section>
-
         <footer class="border-t border-zinc-200 pt-6 text-center text-xs text-zinc-400 dark:border-zinc-800">
           Trading Journal · Chỉ xem
         </footer>
@@ -219,8 +310,8 @@ watch([entryId, journalSlug], loadEntry)
     </main>
 
     <ImageLightbox
-      v-if="showLightbox && imageUrls.length > 0"
-      :sources="imageUrls"
+      v-if="showLightbox && lightboxSources.length > 0"
+      :sources="lightboxSources"
       :start-index="lightboxIndex"
       alt="Chart"
       @close="showLightbox = false"

@@ -32,6 +32,41 @@ function canSeePrivate(req, slug) {
   return session.role === 'user' && session.slug === slug
 }
 
+function entryPayload(body, existing = null) {
+  return {
+    date: body.date ?? existing?.date,
+    session: body.session ?? existing?.session,
+    pair: body.pair ?? existing?.pair ?? '',
+    direction: body.direction ?? existing?.direction,
+    rrIdea: body.rrIdea ?? body.rrPlan ?? body.rr ?? existing?.rrIdea ?? null,
+    rrReal: body.rrReal !== undefined
+      ? body.rrReal
+      : body.rrReality !== undefined
+        ? body.rrReality
+        : existing?.rrReal ?? null,
+    checklist: body.checklist !== undefined ? body.checklist : existing?.checklist,
+    pnl: body.pnl !== undefined ? body.pnl : existing?.pnl ?? null,
+    result: body.result !== undefined ? body.result : existing?.result ?? '',
+    note: body.note !== undefined ? body.note : existing?.note ?? '',
+    tags: body.tags ?? existing?.tags ?? [],
+    visible: body.visible !== undefined ? body.visible : existing?.visible,
+    htfCtc: body.htfCtc ?? existing?.htfCtc ?? '',
+    htfBias: body.htfBias ?? existing?.htfBias ?? '',
+    htfPda: body.htfPda ?? existing?.htfPda ?? '',
+    htfDol: body.htfDol ?? existing?.htfDol ?? '',
+    mtfCtc: body.mtfCtc ?? existing?.mtfCtc ?? '',
+    mtfPda: body.mtfPda ?? existing?.mtfPda ?? '',
+    mtfModel: body.mtfModel ?? existing?.mtfModel ?? '',
+    mtfSweep: body.mtfSweep ?? existing?.mtfSweep ?? false,
+    mtfCisd: body.mtfCisd ?? existing?.mtfCisd ?? false,
+    mtfMss: body.mtfMss ?? existing?.mtfMss ?? false,
+    ltfSweep: body.ltfSweep ?? existing?.ltfSweep ?? false,
+    ltfCisd: body.ltfCisd ?? existing?.ltfCisd ?? false,
+    ltfMss: body.ltfMss ?? existing?.ltfMss ?? false,
+    ltfEntry: body.ltfEntry ?? existing?.ltfEntry ?? '',
+  }
+}
+
 const storage = multer.diskStorage({
   destination: (req, _file, cb) => {
     try {
@@ -43,7 +78,8 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname) || '.png'
-    cb(null, `${req.params.id}-img-${Date.now()}${ext}`)
+    const slot = String(req.query?.slot ?? req.body?.slot ?? 'htf').toLowerCase()
+    cb(null, `${req.params.id}-${slot}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`)
   },
 })
 
@@ -97,17 +133,8 @@ router.post('/entries', requireAccountWrite, (req, res) => {
   if (!store) return
   const today = new Date().toISOString().slice(0, 10)
   const entry = store.createEntry({
+    ...entryPayload(req.body),
     date: req.body.date ?? today,
-    session: req.body.session ?? 'Asia',
-    pair: req.body.pair ?? '',
-    direction: req.body.direction ?? 'LONG',
-    rrPlan: req.body.rrPlan ?? req.body.rr ?? null,
-    rrReality: req.body.rrReality ?? null,
-    checklist: req.body.checklist === true,
-    pnl: req.body.pnl ?? null,
-    note: req.body.note ?? '',
-    tags: req.body.tags ?? [],
-    visible: req.body.visible !== false,
   })
   res.status(201).json(entry)
 })
@@ -119,19 +146,7 @@ router.patch('/entries/:id', requireAccountWrite, (req, res) => {
   const existing = store.getEntryById(id)
   if (!existing) return res.status(404).json({ error: 'Không tìm thấy entry' })
 
-  const entry = store.updateEntry(id, {
-    date: req.body.date ?? existing.date,
-    session: req.body.session ?? existing.session,
-    pair: req.body.pair ?? existing.pair,
-    direction: req.body.direction ?? existing.direction,
-    rrPlan: req.body.rrPlan !== undefined ? req.body.rrPlan : existing.rrPlan,
-    rrReality: req.body.rrReality !== undefined ? req.body.rrReality : existing.rrReality,
-    checklist: req.body.checklist !== undefined ? req.body.checklist : existing.checklist,
-    pnl: req.body.pnl !== undefined ? req.body.pnl : existing.pnl,
-    note: req.body.note !== undefined ? req.body.note : existing.note,
-    tags: req.body.tags ?? existing.tags,
-    visible: req.body.visible !== undefined ? req.body.visible : existing.visible,
-  })
+  const entry = store.updateEntry(id, entryPayload(req.body, existing))
   res.json(entry)
 })
 
@@ -158,9 +173,11 @@ router.post(
       return res.status(400).json({ error: 'Thiếu file ảnh' })
     }
 
+    const slot = req.query.slot ?? req.body.slot ?? 'htf'
+
     try {
       await generateThumbnail(store.uploadsDir, req.file.filename)
-      const entry = store.addEntryImage(id, req.file.filename)
+      const entry = store.addEntryImage(id, req.file.filename, slot)
       res.json(entry)
     } catch (err) {
       removeImageFiles(store.uploadsDir, req.file.filename)

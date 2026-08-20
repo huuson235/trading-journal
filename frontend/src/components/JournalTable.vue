@@ -1,46 +1,24 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
 import { RouterLink } from 'vue-router'
-import type { JournalEntry, SortDirection, SortField } from '@/types/journal'
+import type { JournalEntry, SortDirection, SortField, TradeResult } from '@/types/journal'
 import ImagesCell from './ImagesCell.vue'
-import PairInput from './PairInput.vue'
-import TagsInput from './TagsInput.vue'
-import DateInput from './DateInput.vue'
+import { isoToDisplay } from '@/utils/date'
 
 defineProps<{
   entries: JournalEntry[]
-  pairSuggestions: string[]
-  tagSuggestions: string[]
   sortField: SortField
   sortDirection: SortDirection
   hasAnyEntries: boolean
   slug: string
   readonly?: boolean
-  uploadHandler?: (entryId: number, file: File) => Promise<void>
-  removeImageHandler?: (entryId: number, imageId: number) => Promise<void>
 }>()
 
 const emit = defineEmits<{
   remove: [id: number]
   sort: [field: SortField]
+  edit: [entry: JournalEntry]
+  toggleVisible: [id: number, visible: boolean]
 }>()
-
-/** entryId → note textarea đang mở (mặc định ẩn) */
-const noteOpen = reactive<Record<number, boolean>>({})
-
-function toggleNote(id: number) {
-  noteOpen[id] = !noteOpen[id]
-}
-
-function isNoteOpen(id: number) {
-  return Boolean(noteOpen[id])
-}
-
-const cellInput =
-  'w-full min-w-0 rounded border-0 bg-transparent px-1 py-1 text-[11px] sm:text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400/50 dark:focus:ring-indigo-500/50'
-
-const mobileInput =
-  'w-full rounded border border-zinc-200 bg-zinc-50 px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-800'
 
 const sortableTh =
   'inline-flex w-full items-center gap-0.5 transition hover:text-zinc-700 dark:hover:text-zinc-200'
@@ -53,34 +31,41 @@ function pnlClass(pnl: number | null) {
   return pnl > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
 }
 
-function rowBgClass(pnl: number | null) {
-  if (pnl == null || pnl === 0) {
-    return 'hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30'
-  }
-  if (pnl > 0) {
+function rowBgClass(pnl: number | null, result: TradeResult) {
+  if (result === 'Take profit' || (result === '' && pnl != null && pnl > 0)) {
     return 'bg-emerald-100 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-950/60'
   }
-  return 'bg-rose-100 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-950/60'
+  if (result === 'Stop loss' || (result === '' && pnl != null && pnl < 0)) {
+    return 'bg-rose-100 hover:bg-rose-100 dark:bg-rose-950/50 dark:hover:bg-rose-950/60'
+  }
+  return 'hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30'
 }
 
-function stickyCellClass(pnl: number | null) {
-  if (pnl == null || pnl === 0) {
-    return 'bg-white group-hover:bg-zinc-50/80 dark:bg-zinc-900 dark:group-hover:bg-zinc-800/30'
-  }
-  if (pnl > 0) {
+function stickyCellClass(pnl: number | null, result: TradeResult) {
+  if (result === 'Take profit' || (result === '' && pnl != null && pnl > 0)) {
     return 'bg-emerald-100 group-hover:bg-emerald-100 dark:bg-emerald-950/50 dark:group-hover:bg-emerald-950/60'
   }
-  return 'bg-rose-100 group-hover:bg-rose-100 dark:bg-rose-950/50 dark:group-hover:bg-rose-950/60'
+  if (result === 'Stop loss' || (result === '' && pnl != null && pnl < 0)) {
+    return 'bg-rose-100 group-hover:bg-rose-100 dark:bg-rose-950/50 dark:group-hover:bg-rose-950/60'
+  }
+  return 'bg-white group-hover:bg-zinc-50/80 dark:bg-zinc-900 dark:group-hover:bg-zinc-800/30'
 }
 
-function mobileCardClass(pnl: number | null) {
-  if (pnl == null || pnl === 0) {
-    return 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900'
-  }
-  if (pnl > 0) {
+function mobileCardClass(pnl: number | null, result: TradeResult) {
+  if (result === 'Take profit' || (result === '' && pnl != null && pnl > 0)) {
     return 'border-emerald-300 bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950/50'
   }
-  return 'border-rose-300 bg-rose-100 dark:border-rose-800 dark:bg-rose-950/50'
+  if (result === 'Stop loss' || (result === '' && pnl != null && pnl < 0)) {
+    return 'border-rose-300 bg-rose-100 dark:border-rose-800 dark:bg-rose-950/50'
+  }
+  return 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900'
+}
+
+function resultClass(result: TradeResult) {
+  if (result === 'Take profit') return 'bg-emerald-600 text-white'
+  if (result === 'Stop loss') return 'bg-rose-600 text-white'
+  if (result === 'BE') return 'bg-zinc-700 text-white'
+  return 'bg-zinc-200 text-zinc-500 dark:bg-zinc-700 dark:text-zinc-300'
 }
 
 function sortMark(field: SortField, active: SortField, dir: SortDirection) {
@@ -92,8 +77,18 @@ function thClass(field: SortField, active: SortField) {
   return field === active ? 'text-indigo-600 dark:text-indigo-400' : ''
 }
 
-function hasNote(entry: JournalEntry) {
-  return Boolean(entry.note?.trim())
+function formatNum(value: number | null) {
+  if (value == null) return '—'
+  return String(value)
+}
+
+function allImages(entry: JournalEntry) {
+  if (entry.images?.length) return entry.images
+  return [...(entry.htfImages ?? []), ...(entry.mtfImages ?? []), ...(entry.ltfImages ?? [])]
+}
+
+function noteText(entry: JournalEntry) {
+  return (entry.note ?? '').trim()
 }
 </script>
 
@@ -117,196 +112,159 @@ function hasNote(entry: JournalEntry) {
                   Pair <span class="text-[9px]">{{ sortMark('pair', sortField, sortDirection) }}</span>
                 </button>
               </th>
-              <th class="w-12 px-1.5 py-1.5 text-right" title="R:R plan">
-                <button type="button" :class="[sortableTh, 'justify-end', thClass('rrPlan', sortField)]" @click="emit('sort', 'rrPlan')">
-                  R:R Plan <span class="text-[9px]">{{ sortMark('rrPlan', sortField, sortDirection) }}</span>
+              <th class="w-[120px] px-1.5 py-1.5">
+                <button type="button" :class="[sortableTh, thClass('session', sortField)]" @click="emit('sort', 'session')">
+                  Session <span class="text-[9px]">{{ sortMark('session', sortField, sortDirection) }}</span>
                 </button>
               </th>
-              <th class="w-12 px-1.5 py-1.5 text-right" title="R:R reality">
-                <button type="button" :class="[sortableTh, 'justify-end', thClass('rrReality', sortField)]" @click="emit('sort', 'rrReality')">
-                  R:R Real <span class="text-[9px]">{{ sortMark('rrReality', sortField, sortDirection) }}</span>
+              <th class="w-[110px] px-1.5 py-1.5">
+                <button type="button" :class="[sortableTh, thClass('result', sortField)]" @click="emit('sort', 'result')">
+                  Result <span class="text-[9px]">{{ sortMark('result', sortField, sortDirection) }}</span>
                 </button>
               </th>
-              <th class="w-10 px-1.5 py-1.5 text-center" title="Checklist">
-                <button type="button" :class="[sortableTh, 'justify-center', thClass('checklist', sortField)]" @click="emit('sort', 'checklist')">
-                  Checklist <span class="text-[9px]">{{ sortMark('checklist', sortField, sortDirection) }}</span>
+              <th class="w-16 px-1.5 py-1.5 text-right">
+                <button type="button" :class="[sortableTh, 'justify-end', thClass('rrIdea', sortField)]" @click="emit('sort', 'rrIdea')">
+                  RR idea <span class="text-[9px]">{{ sortMark('rrIdea', sortField, sortDirection) }}</span>
                 </button>
               </th>
-              <th v-if="!readonly" class="w-12 px-1.5 py-2 text-right">
+              <th class="w-16 px-1.5 py-1.5 text-right">
+                <button type="button" :class="[sortableTh, 'justify-end', thClass('rrReal', sortField)]" @click="emit('sort', 'rrReal')">
+                  RR real <span class="text-[9px]">{{ sortMark('rrReal', sortField, sortDirection) }}</span>
+                </button>
+              </th>
+              <th v-if="!readonly" class="w-16 px-1.5 py-2 text-right">
                 <button type="button" :class="[sortableTh, 'justify-end', thClass('pnl', sortField)]" @click="emit('sort', 'pnl')">
                   PnL <span class="text-[9px]">{{ sortMark('pnl', sortField, sortDirection) }}</span>
                 </button>
               </th>
-              <th class="min-w-[180px] px-1.5 py-2">Tags</th>
-              <th class="min-w-[180px] w-[180px] px-1.5 py-2">Images</th>
-              <th class="w-[72px] px-0.5 py-1.5" />
+              <th class="min-w-[160px] px-1.5 py-2">Note</th>
+              <th class="min-w-[140px] w-[140px] px-1.5 py-2">Images</th>
+              <th class="w-[88px] px-0.5 py-1.5" />
             </tr>
           </thead>
           <tbody class="divide-y divide-zinc-100 dark:divide-zinc-800">
-            <template v-for="entry in entries" :key="entry.id">
-              <tr
-                class="group min-h-[2.25rem] transition-colors"
-                :class="[rowBgClass(entry.pnl), !entry.visible ? 'opacity-50' : '']"
-              >
-                <td :class="['sticky left-0 z-10 whitespace-nowrap px-1.5 py-1 font-mono text-[11px] text-zinc-400', stickyCellClass(entry.pnl)]">
-                  {{ entry.no }}
-                </td>
-                <td :class="['sticky left-9 z-10 min-w-[104px] whitespace-nowrap px-0.5 py-1', stickyCellClass(entry.pnl)]">
-                  <DateInput v-model="entry.date" :input-class="cellInput" :readonly="readonly" />
-                </td>
-                <td class="min-w-[76px] whitespace-nowrap px-0.5 py-1">
-                  <PairInput
-                    v-model="entry.pair"
-                    :suggestions="pairSuggestions"
-                    :input-class="cellInput + ' uppercase'"
-                    placeholder="—"
-                    :readonly="readonly"
-                  />
-                </td>
-                <td class="whitespace-nowrap px-0.5 py-1">
-                  <input
-                    v-model.number="entry.rrPlan"
-                    type="number"
-                    step="any"
-                    placeholder="—"
-                    :readonly="readonly"
-                    :class="cellInput + ' no-spinner text-right'"
-                    title="R:R plan"
-                  />
-                </td>
-                <td class="whitespace-nowrap px-0.5 py-1">
-                  <input
-                    v-model.number="entry.rrReality"
-                    type="number"
-                    step="any"
-                    placeholder="—"
-                    :readonly="readonly"
-                    :class="cellInput + ' no-spinner text-right'"
-                    title="R:R reality"
-                  />
-                </td>
-                <td class="whitespace-nowrap px-0.5 py-1 text-center">
-                  <input
-                    v-model="entry.checklist"
-                    type="checkbox"
-                    class="h-3.5 w-3.5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-400/50 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-800"
-                    :disabled="readonly"
-                    title="Checklist"
-                  />
-                </td>
-                <td v-if="!readonly" class="whitespace-nowrap px-0.5 py-1">
-                  <input
-                    v-model.number="entry.pnl"
-                    type="number"
-                    step="any"
-                    placeholder="—"
-                    :readonly="readonly"
-                    :class="[cellInput, 'no-spinner text-right font-medium', pnlClass(entry.pnl)]"
-                  />
-                </td>
-                <td class="min-w-[180px] max-w-[240px] align-middle px-0.5 py-1">
-                  <TagsInput
-                    v-model="entry.tags"
-                    :suggestions="tagSuggestions"
-                    :readonly="readonly"
-                  />
-                </td>
-                <td class="min-w-[180px] w-[180px] align-middle px-0.5 py-1">
-                  <ImagesCell
-                    :entry-id="entry.id"
-                    :images="entry.images"
-                    :readonly="readonly"
-                    :upload-handler="readonly ? undefined : uploadHandler"
-                    :remove-image-handler="readonly ? undefined : removeImageHandler"
-                  />
-                </td>
-                <td class="whitespace-nowrap px-0.5 py-1">
-                  <div class="flex items-center justify-end gap-0.5">
-                    <button
-                      v-if="!readonly"
-                      type="button"
-                      :class="[
-                        actionBtn,
-                        isNoteOpen(entry.id)
-                          ? 'text-indigo-600 opacity-100 dark:text-indigo-400'
-                          : hasNote(entry)
-                            ? 'text-indigo-500/80 opacity-100'
-                            : 'opacity-70 group-hover:opacity-100',
-                      ]"
-                      :title="isNoteOpen(entry.id) ? 'Ẩn note' : 'Hiện note'"
-                      @click="toggleNote(entry.id)"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
-                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                        <polyline points="14 2 14 8 20 8" />
-                        <line x1="16" x2="8" y1="13" y2="13" />
-                        <line x1="16" x2="8" y1="17" y2="17" />
-                        <line x1="10" x2="8" y1="9" y2="9" />
-                      </svg>
-                    </button>
-                    <button
-                      v-if="!readonly"
-                      type="button"
-                      :class="[
-                        actionBtn,
-                        entry.visible
-                          ? 'text-zinc-400 opacity-70 group-hover:opacity-100'
-                          : 'text-amber-500 opacity-100',
-                      ]"
-                      :title="entry.visible ? 'Đang hiện — click để ẩn khỏi người xem' : 'Đang ẩn — click để hiện'"
-                      @click="entry.visible = !entry.visible"
-                    >
-                      <svg v-if="entry.visible" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
-                        <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                        <circle cx="12" cy="12" r="3" />
-                      </svg>
-                      <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
-                        <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
-                        <path d="M10.73 5.08A10.43 10.43 0 0 1 12.05 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
-                        <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
-                        <line x1="2" x2="22" y1="2" y2="22" />
-                      </svg>
-                    </button>
-                    <RouterLink
-                      v-if="entry.visible"
-                      :to="{ name: 'entry-detail', params: { slug, id: entry.id } }"
-                      target="_blank"
-                      :class="[actionBtn, 'opacity-70 group-hover:opacity-100']"
-                      title="Xem & chia sẻ"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
-                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                      </svg>
-                    </RouterLink>
-                    <button
-                      v-if="!readonly"
-                      type="button"
-                      class="rounded p-0.5 text-zinc-300 opacity-0 transition hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100 dark:hover:bg-rose-950/50 dark:hover:text-rose-400"
-                      title="Xóa"
-                      @click="emit('remove', entry.id)"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
-                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      </svg>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr
-                v-if="!readonly && isNoteOpen(entry.id)"
-                :class="[rowBgClass(entry.pnl), !entry.visible ? 'opacity-50' : '']"
-              >
-                <td :colspan="readonly ? 9 : 10" class="px-1.5 pb-2 pt-0">
-                  <textarea
-                    v-model="entry.note"
-                    rows="5"
-                    placeholder="Note..."
-                    class="w-full resize-y rounded-md border border-zinc-200 bg-white/80 px-2 py-1.5 text-xs text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-indigo-400/50 dark:border-zinc-700 dark:bg-zinc-950/40 dark:text-zinc-300 dark:placeholder:text-zinc-600 dark:focus:ring-indigo-500/50"
-                  />
-                </td>
-              </tr>
-            </template>
+            <tr
+              v-for="entry in entries"
+              :key="entry.id"
+              class="group min-h-[2.25rem] transition-colors"
+              :class="[
+                rowBgClass(entry.pnl, entry.result),
+                !entry.visible ? 'opacity-50' : '',
+                readonly ? '' : 'cursor-pointer',
+              ]"
+              @click="readonly ? undefined : emit('edit', entry)"
+            >
+              <td :class="['sticky left-0 z-10 whitespace-nowrap px-1.5 py-1.5 font-mono text-[11px] text-zinc-400', stickyCellClass(entry.pnl, entry.result)]">
+                {{ entry.no }}
+              </td>
+              <td :class="['sticky left-9 z-10 min-w-[104px] whitespace-nowrap px-1.5 py-1.5 text-xs', stickyCellClass(entry.pnl, entry.result)]">
+                {{ isoToDisplay(entry.date) || '—' }}
+              </td>
+              <td class="whitespace-nowrap px-1.5 py-1.5 text-xs font-medium uppercase">
+                {{ entry.pair || '—' }}
+              </td>
+              <td class="whitespace-nowrap px-1.5 py-1.5 text-xs text-zinc-600 dark:text-zinc-300">
+                {{ entry.session || '—' }}
+              </td>
+              <td class="whitespace-nowrap px-1.5 py-1.5">
+                <span
+                  v-if="entry.result"
+                  class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium"
+                  :class="resultClass(entry.result)"
+                >
+                  {{ entry.result }}
+                </span>
+                <span v-else class="text-xs text-zinc-400">—</span>
+              </td>
+              <td class="whitespace-nowrap px-1.5 py-1.5 text-right text-xs tabular-nums">
+                {{ formatNum(entry.rrIdea) }}
+              </td>
+              <td class="whitespace-nowrap px-1.5 py-1.5 text-right text-xs tabular-nums">
+                {{ formatNum(entry.rrReal) }}
+              </td>
+              <td v-if="!readonly" :class="['whitespace-nowrap px-1.5 py-1.5 text-right text-xs font-medium tabular-nums', pnlClass(entry.pnl)]">
+                {{ formatNum(entry.pnl) }}
+              </td>
+              <td class="min-w-[160px] max-w-[240px] px-1.5 py-1.5 align-middle">
+                <p
+                  v-if="noteText(entry)"
+                  class="line-clamp-2 whitespace-pre-wrap text-xs leading-snug text-zinc-600 dark:text-zinc-300"
+                  :title="noteText(entry)"
+                >
+                  {{ noteText(entry) }}
+                </p>
+                <span v-else class="text-xs text-zinc-400">—</span>
+              </td>
+              <td class="min-w-[140px] w-[140px] align-middle px-0.5 py-1" @click.stop>
+                <ImagesCell
+                  :entry-id="entry.id"
+                  :images="allImages(entry)"
+                  readonly
+                />
+              </td>
+              <td class="whitespace-nowrap px-0.5 py-1" @click.stop>
+                <div class="flex items-center justify-end gap-0.5">
+                  <button
+                    v-if="!readonly"
+                    type="button"
+                    :class="[actionBtn, 'opacity-70 group-hover:opacity-100']"
+                    title="Sửa"
+                    @click="emit('edit', entry)"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                  </button>
+                  <button
+                    v-if="!readonly"
+                    type="button"
+                    :class="[
+                      actionBtn,
+                      entry.visible
+                        ? 'text-zinc-400 opacity-70 group-hover:opacity-100'
+                        : 'text-amber-500 opacity-100',
+                    ]"
+                    :title="entry.visible ? 'Đang hiện — click để ẩn khỏi người xem' : 'Đang ẩn — click để hiện'"
+                    @click="emit('toggleVisible', entry.id, !entry.visible)"
+                  >
+                    <svg v-if="entry.visible" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
+                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
+                      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                      <path d="M10.73 5.08A10.43 10.43 0 0 1 12.05 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+                      <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+                      <line x1="2" x2="22" y1="2" y2="22" />
+                    </svg>
+                  </button>
+                  <RouterLink
+                    v-if="entry.visible"
+                    :to="{ name: 'entry-detail', params: { slug, id: entry.id } }"
+                    target="_blank"
+                    :class="[actionBtn, 'opacity-70 group-hover:opacity-100']"
+                    title="Xem & chia sẻ"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                    </svg>
+                  </RouterLink>
+                  <button
+                    v-if="!readonly"
+                    type="button"
+                    class="rounded p-0.5 text-zinc-300 opacity-0 transition hover:bg-rose-50 hover:text-rose-500 group-hover:opacity-100 dark:hover:bg-rose-950/50 dark:hover:text-rose-400"
+                    title="Xóa"
+                    @click="emit('remove', entry.id)"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5">
+                      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -315,64 +273,38 @@ function hasNote(entry: JournalEntry) {
         v-if="entries.length === 0"
         class="px-4 py-12 text-center text-sm text-zinc-400"
       >
-        {{ hasAnyEntries ? 'Không có giao dịch trong khoảng thời gian này.' : 'Chưa có giao dịch. Nhấn "Thêm dòng" để bắt đầu.' }}
+        {{ hasAnyEntries ? 'Không có giao dịch trong khoảng thời gian này.' : 'Chưa có giao dịch. Nhấn "New Trade" để bắt đầu.' }}
       </div>
     </div>
 
-    <!-- Mobile -->
     <div class="space-y-2 md:hidden">
       <div
         v-if="entries.length === 0"
         class="rounded-lg border border-dashed border-zinc-300 px-4 py-10 text-center text-sm text-zinc-400 dark:border-zinc-700"
       >
-        {{ hasAnyEntries ? 'Không có giao dịch trong khoảng thời gian này.' : 'Chưa có giao dịch. Nhấn "Thêm dòng" để bắt đầu.' }}
+        {{ hasAnyEntries ? 'Không có giao dịch trong khoảng thời gian này.' : 'Chưa có giao dịch. Nhấn "New Trade" để bắt đầu.' }}
       </div>
 
       <article
         v-for="entry in entries"
         :key="entry.id"
         class="rounded-lg border p-3 shadow-sm"
-        :class="[mobileCardClass(entry.pnl), !entry.visible ? 'opacity-50' : '']"
+        :class="[mobileCardClass(entry.pnl, entry.result), !entry.visible ? 'opacity-50' : '']"
+        @click="readonly ? undefined : emit('edit', entry)"
       >
         <div class="mb-2 flex items-center justify-between gap-2">
           <div class="flex items-center gap-2">
             <span class="font-mono text-xs text-zinc-400">#{{ entry.no }}</span>
-            <DateInput
-              v-model="entry.date"
-              :input-class="mobileInput + ' !min-w-[128px]'"
-              :readonly="readonly"
-            />
+            <span class="text-xs font-medium">{{ isoToDisplay(entry.date) }}</span>
+            <span class="text-xs font-semibold uppercase">{{ entry.pair || '—' }}</span>
           </div>
-          <div class="flex items-center gap-1">
-            <button
-              v-if="!readonly"
-              type="button"
-              :class="[
-                actionBtn,
-                'p-1',
-                isNoteOpen(entry.id)
-                  ? 'text-indigo-600 dark:text-indigo-400'
-                  : hasNote(entry)
-                    ? 'text-indigo-500'
-                    : '',
-              ]"
-              :title="isNoteOpen(entry.id) ? 'Ẩn note' : 'Hiện note'"
-              @click="toggleNote(entry.id)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
-                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" x2="8" y1="13" y2="13" />
-                <line x1="16" x2="8" y1="17" y2="17" />
-                <line x1="10" x2="8" y1="9" y2="9" />
-              </svg>
-            </button>
+          <div class="flex items-center gap-1" @click.stop>
             <button
               v-if="!readonly"
               type="button"
               :class="[actionBtn, 'p-1', entry.visible ? '' : 'text-amber-500']"
               :title="entry.visible ? 'Ẩn khỏi người xem' : 'Hiện cho người xem'"
-              @click="entry.visible = !entry.visible"
+              @click="emit('toggleVisible', entry.id, !entry.visible)"
             >
               <svg v-if="entry.visible" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4">
                 <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" />
@@ -406,75 +338,33 @@ function hasNote(entry: JournalEntry) {
           </div>
         </div>
 
-        <div class="mb-2 grid grid-cols-2 gap-2">
-          <div>
-            <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">Pair</label>
-            <PairInput
-              v-model="entry.pair"
-              :suggestions="pairSuggestions"
-              :input-class="mobileInput + ' uppercase'"
-              :readonly="readonly"
-            />
-          </div>
-          <div class="flex items-end gap-3 pb-1">
-            <label class="inline-flex items-center gap-1.5 text-[10px] uppercase text-zinc-400">
-              <input
-                v-model="entry.checklist"
-                type="checkbox"
-                class="h-3.5 w-3.5 rounded border-zinc-300 text-indigo-600 focus:ring-indigo-400/50 disabled:opacity-60 dark:border-zinc-600"
-                :disabled="readonly"
-              />
-              Checklist
-            </label>
-          </div>
-          <div>
-            <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">R:R plan</label>
-            <input v-model.number="entry.rrPlan" type="number" step="any" :readonly="readonly" :class="mobileInput + ' no-spinner'" />
-          </div>
-          <div>
-            <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">R:R reality</label>
-            <input v-model.number="entry.rrReality" type="number" step="any" :readonly="readonly" :class="mobileInput + ' no-spinner'" />
-          </div>
-          <div v-if="!readonly" class="col-span-2">
-            <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">PnL</label>
-            <input
-              v-model.number="entry.pnl"
-              type="number"
-              step="any"
-              placeholder="0"
-              :readonly="readonly"
-              :class="[mobileInput, 'no-spinner font-medium tabular-nums', pnlClass(entry.pnl)]"
-            />
-          </div>
+        <div class="mb-2 flex flex-wrap items-center gap-2 text-xs">
+          <span class="text-zinc-500">{{ entry.session || '—' }}</span>
+          <span
+            v-if="entry.result"
+            class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium"
+            :class="resultClass(entry.result)"
+          >
+            {{ entry.result }}
+          </span>
+          <span class="tabular-nums text-zinc-500">RR {{ formatNum(entry.rrIdea) }}/{{ formatNum(entry.rrReal) }}</span>
+          <span v-if="!readonly" :class="['font-medium tabular-nums', pnlClass(entry.pnl)]">
+            {{ formatNum(entry.pnl) }}
+          </span>
         </div>
 
-        <div class="mb-2">
-          <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">Tags</label>
-          <TagsInput
-            v-model="entry.tags"
-            :suggestions="tagSuggestions"
-            :readonly="readonly"
-          />
-        </div>
+        <p
+          v-if="noteText(entry)"
+          class="mb-2 line-clamp-3 whitespace-pre-wrap text-xs leading-snug text-zinc-600 dark:text-zinc-300"
+        >
+          {{ noteText(entry) }}
+        </p>
 
-        <div v-if="!readonly && isNoteOpen(entry.id)" class="mb-2">
-          <label class="mb-0.5 block text-[10px] uppercase text-zinc-400">Note</label>
-          <textarea
-            v-model="entry.note"
-            rows="2"
-            placeholder="Note..."
-            class="w-full resize-y rounded border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-xs text-zinc-700 placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-indigo-400/50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:placeholder:text-zinc-600"
-          />
-        </div>
-
-        <div>
-          <label class="mb-0.5 block text-[10px] font-medium uppercase text-zinc-400">Images</label>
+        <div @click.stop>
           <ImagesCell
             :entry-id="entry.id"
-            :images="entry.images"
-            :readonly="readonly"
-            :upload-handler="readonly ? undefined : uploadHandler"
-            :remove-image-handler="readonly ? undefined : removeImageHandler"
+            :images="allImages(entry)"
+            readonly
           />
         </div>
       </article>

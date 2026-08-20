@@ -21,13 +21,15 @@ const filtered = computed(() => {
 })
 
 function selectPair(pair: string) {
-  model.value = pair
+  model.value = pair.toUpperCase()
   isOpen.value = false
   inputRef.value?.blur()
 }
 
-function onInput() {
+function onInput(e: Event) {
   if (props.readonly) return
+  const value = (e.target as HTMLInputElement).value.toUpperCase()
+  model.value = value
   isOpen.value = true
 }
 
@@ -60,7 +62,7 @@ function onBlur() {
 
     <ul
       v-if="!readonly && isOpen && filtered.length > 0"
-      class="absolute left-0 right-0 top-full z-30 mt-0.5 max-h-32 overflow-y-auto rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800"
+      class="absolute left-0 right-0 top-full z-50 mt-0.5 max-h-32 overflow-y-auto rounded-md border border-zinc-200 bg-white py-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800"
     >
       <li v-for="pair in filtered" :key="pair">
         <button

@@ -27,11 +27,11 @@ const filterInput =
 const sortFields: { key: SortField; label: string }[] = [
   { key: 'date', label: 'Date' },
   { key: 'pair', label: 'Pair' },
-  { key: 'rrPlan', label: 'R:R plan' },
-  { key: 'rrReality', label: 'R:R real' },
-  { key: 'checklist', label: 'Checklist' },
-  { key: 'pnl', label: 'PnL' },
+  { key: 'session', label: 'Session' },
   { key: 'result', label: 'Kết quả' },
+  { key: 'rrIdea', label: 'RR idea' },
+  { key: 'rrReal', label: 'RR real' },
+  { key: 'pnl', label: 'PnL' },
 ]
 
 function sortIcon(field: SortField, activeField: SortField, direction: SortDirection) {

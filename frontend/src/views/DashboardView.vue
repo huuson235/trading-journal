@@ -7,15 +7,20 @@ import ThemeToggle from '@/components/ThemeToggle.vue'
 import BackgroundToggle from '@/components/BackgroundToggle.vue'
 import LoginModal from '@/components/LoginModal.vue'
 import ChangePasswordModal from '@/components/ChangePasswordModal.vue'
-import { useJournal } from '@/composables/useJournal'
+import TradeFormModal from '@/components/TradeFormModal.vue'
+import { useJournal, type SlotFiles } from '@/composables/useJournal'
 import { useAuth } from '@/composables/useAuth'
 import { useBackground } from '@/composables/useBackground'
+import type { JournalEntry, TradePayload } from '@/types/journal'
 
 const route = useRoute()
 const router = useRouter()
 const { username, isAuthenticated, isRoot, isUser, canEditSlug, logout } = useAuth()
 const showLogin = ref(false)
 const showChangePassword = ref(false)
+const formOpen = ref(false)
+const editingEntry = ref<JournalEntry | null>(null)
+const saving = ref(false)
 
 const journalSlug = computed(() => String(route.params.slug ?? ''))
 
@@ -34,18 +39,16 @@ const {
   resetToCurrentMonth,
   resetToPreviousMonth,
   pairSuggestions,
-  tagSuggestions,
   loading,
   error,
   totalPnl,
-  totalRrReality,
+  totalRrReal,
   winCount,
   winRate,
   statsEntries,
-  addEntry,
+  saveTrade,
+  setVisible,
   removeEntry,
-  uploadImage,
-  removeImage,
   reload,
 } = useJournal(journalSlug)
 
@@ -60,9 +63,9 @@ const totalClass = computed(() => {
   return 'text-zinc-500'
 })
 
-const rrRealityClass = computed(() => {
-  if (totalRrReality.value > 0) return 'text-emerald-600 dark:text-emerald-400'
-  if (totalRrReality.value < 0) return 'text-rose-600 dark:text-rose-400'
+const rrRealClass = computed(() => {
+  if (totalRrReal.value > 0) return 'text-emerald-600 dark:text-emerald-400'
+  if (totalRrReal.value < 0) return 'text-rose-600 dark:text-rose-400'
   return 'text-zinc-500'
 })
 
@@ -73,6 +76,33 @@ const winSummary = computed(() => {
   const total = statsEntries.value.length
   return `${winCount.value}/${total} (${winRate.value}%)`
 })
+
+function openNewTrade() {
+  editingEntry.value = null
+  formOpen.value = true
+}
+
+function openEdit(entry: JournalEntry) {
+  if (!canEdit.value) return
+  editingEntry.value = entry
+  formOpen.value = true
+}
+
+async function onSave(payload: Partial<TradePayload>, files: SlotFiles, removedImageIds: number[]) {
+  saving.value = true
+  try {
+    await saveTrade(payload, files, {
+      id: editingEntry.value?.id,
+      removedImageIds,
+    })
+    formOpen.value = false
+    editingEntry.value = null
+  } catch {
+    /* error shown by useJournal */
+  } finally {
+    saving.value = false
+  }
+}
 
 async function onLogout() {
   await logout()
@@ -103,7 +133,7 @@ async function onLogout() {
             </span>
           </div>
           <p class="hidden text-xs text-zinc-500 sm:block">
-            {{ readonly ? 'Đăng nhập tài khoản này để chỉnh sửa' : 'Ghi nhật ký giao dịch — paste ảnh chart bằng Ctrl+V' }}
+            {{ readonly ? 'Đăng nhập tài khoản này để chỉnh sửa' : 'Ghi nhật ký giao dịch — nhấn New Trade để mở form' }}
           </p>
         </div>
 
@@ -117,8 +147,8 @@ async function onLogout() {
               <span class="text-zinc-300 dark:text-zinc-600">/</span>
             </template>
             <span class="text-zinc-400">Total R:R real</span>
-            <span :class="['font-semibold tabular-nums', rrRealityClass]">
-              {{ formatSigned(totalRrReality) }}
+            <span :class="['font-semibold tabular-nums', rrRealClass]">
+              {{ formatSigned(totalRrReal) }}
             </span>
             <span class="text-zinc-300 dark:text-zinc-600">/</span>
             <span class="text-zinc-400">Win</span>
@@ -128,14 +158,14 @@ async function onLogout() {
           <button
             v-if="canEdit"
             type="button"
-            class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-indigo-500 sm:px-4 sm:py-2 sm:text-sm"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-[#1976D2] px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-[#1565C0] sm:px-4 sm:py-2 sm:text-sm"
             :disabled="loading"
-            @click="addEntry"
+            @click="openNewTrade"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5 sm:h-4 sm:w-4">
               <path d="M12 5v14M5 12h14" />
             </svg>
-            Thêm dòng
+            New Trade
           </button>
 
           <RouterLink
@@ -187,8 +217,8 @@ async function onLogout() {
           <span class="text-zinc-300 dark:text-zinc-600">/</span>
         </template>
         <span class="text-zinc-400">R:R real</span>
-        <span :class="['font-semibold tabular-nums', rrRealityClass]">
-          {{ formatSigned(totalRrReality) }}
+        <span :class="['font-semibold tabular-nums', rrRealClass]">
+          {{ formatSigned(totalRrReal) }}
         </span>
         <span class="text-zinc-300 dark:text-zinc-600">/</span>
         <span class="text-zinc-400">Win</span>
@@ -226,22 +256,27 @@ async function onLogout() {
 
         <JournalTable
           :entries="visibleEntries"
-          :pair-suggestions="pairSuggestions"
-          :tag-suggestions="tagSuggestions"
           :sort-field="sortField"
           :sort-direction="sortDirection"
           :has-any-entries="entries.length > 0"
           :slug="journalSlug"
           :readonly="readonly"
-          :upload-handler="uploadImage"
-          :remove-image-handler="removeImage"
           @sort="setSort"
           @remove="removeEntry"
+          @edit="openEdit"
+          @toggle-visible="setVisible"
         />
       </template>
     </main>
 
     <LoginModal v-model:open="showLogin" />
     <ChangePasswordModal v-model:open="showChangePassword" />
+    <TradeFormModal
+      v-model:open="formOpen"
+      :entry="editingEntry"
+      :pair-suggestions="pairSuggestions"
+      :saving="saving"
+      @save="onSave"
+    />
   </div>
 </template>
