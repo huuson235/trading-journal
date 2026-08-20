@@ -3,8 +3,10 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { fetchEntry } from '@/api/journal'
 import ImageLightbox from '@/components/ImageLightbox.vue'
+import LightboxCaption from '@/components/LightboxCaption.vue'
 import { useAuth } from '@/composables/useAuth'
 import type { EntryImage, JournalEntry } from '@/types/journal'
+import { timeframeHasLtf } from '@/types/journal'
 import { isoToDisplay } from '@/utils/date'
 import { getTagClass } from '@/utils/tagStyles'
 
@@ -17,7 +19,19 @@ const error = ref<string | null>(null)
 const copied = ref(false)
 const lightboxIndex = ref(0)
 const showLightbox = ref(false)
-const lightboxSources = ref<string[]>([])
+
+const allDetailImages = computed(() => {
+  const current = entry.value
+  if (!current) return [] as EntryImage[]
+  const images = [
+    ...(current.htfImages ?? []),
+    ...(current.mtfImages ?? []),
+  ]
+  if (timeframeHasLtf(current.timeframe)) images.push(...(current.ltfImages ?? []))
+  return images
+})
+
+const lightboxSources = computed(() => allDetailImages.value.map((img) => img.imageUrl))
 
 const journalSlug = computed(() => String(route.params.slug ?? ''))
 const entryId = computed(() => Number(route.params.id))
@@ -46,7 +60,7 @@ function formatPnl(pnl: number | null) {
   return `${pnl >= 0 ? '+' : ''}${pnl}`
 }
 
-function formatRr(rr: number | null) {
+function formatRrPart(rr: number | null) {
   if (rr == null) return '—'
   return String(rr)
 }
@@ -59,9 +73,28 @@ function formatFlag(value: string) {
   return value || '—'
 }
 
-function openImages(images: EntryImage[], index: number) {
-  lightboxSources.value = images.map((img) => img.imageUrl)
-  lightboxIndex.value = index
+function chipClass(value: string) {
+  const v = value.trim().toLowerCase()
+  if (v === 'bullish') return 'bg-emerald-600 text-white'
+  if (v === 'bearish') return 'bg-rose-600 text-white'
+  return 'bg-zinc-950 text-white'
+}
+
+const chipBase = 'inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium'
+
+const headline = computed(() => {
+  const current = entry.value
+  if (!current) return ''
+  const pair = (current.pair || '—').toUpperCase()
+  const idea = formatRrPart(current.rrIdea)
+  const real = formatRrPart(current.rrReal)
+  const timeframe = current.timeframe || '—'
+  return `${pair} - RR ${real}/${idea} - ${timeframe}`
+})
+
+function openImages(clicked: EntryImage) {
+  const index = allDetailImages.value.findIndex((img) => img.id === clicked.id)
+  lightboxIndex.value = index >= 0 ? index : 0
   showLightbox.value = true
 }
 
@@ -103,9 +136,9 @@ watch([entryId, journalSlug], loadEntry)
 </script>
 
 <template>
-  <div class="min-h-screen bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
-    <header class="border-b border-zinc-200 bg-white/80 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">
-      <div class="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+  <div class="flex min-h-screen flex-col bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100">
+    <header class="shrink-0 border-b border-zinc-200 bg-white/80 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/80">
+      <div class="mx-auto flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <RouterLink
           :to="{ name: 'journal', params: { slug: journalSlug } }"
           class="text-sm font-medium text-zinc-500 transition hover:text-zinc-800 dark:hover:text-zinc-200"
@@ -127,7 +160,7 @@ watch([entryId, journalSlug], loadEntry)
       </div>
     </header>
 
-    <main class="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
+    <main class="mx-auto w-full flex-1 px-4 py-6 sm:px-6 lg:min-h-0 lg:overflow-hidden lg:py-3">
       <div v-if="loading" class="py-24 text-center text-sm text-zinc-400">Đang tải...</div>
 
       <div
@@ -143,8 +176,8 @@ watch([entryId, journalSlug], loadEntry)
         </RouterLink>
       </div>
 
-      <article v-else-if="entry" class="space-y-8">
-        <header class="space-y-4">
+      <article v-else-if="entry" class="space-y-5 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:space-y-3">
+        <header class="shrink-0 space-y-2">
           <div class="flex flex-wrap items-center gap-2">
             <span class="rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
               #{{ entry.no }}
@@ -158,137 +191,153 @@ watch([entryId, journalSlug], loadEntry)
             >
               {{ entry.result }}
             </span>
-          </div>
-
-          <h1 class="text-3xl font-bold tracking-tight sm:text-4xl">
-            {{ entry.pair || '—' }}
-          </h1>
-
-          <div class="flex flex-wrap gap-3">
-            <div class="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
-              <div class="text-[10px] font-medium uppercase tracking-wide text-zinc-400">RR idea</div>
-              <div class="mt-0.5 text-xl font-semibold tabular-nums">{{ formatRr(entry.rrIdea) }}</div>
-            </div>
-            <div class="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900">
-              <div class="text-[10px] font-medium uppercase tracking-wide text-zinc-400">RR real</div>
-              <div class="mt-0.5 text-xl font-semibold tabular-nums">{{ formatRr(entry.rrReal) }}</div>
-            </div>
-            <div
-              v-if="canSeePnl"
-              class="rounded-xl border border-zinc-200 bg-white px-4 py-3 dark:border-zinc-800 dark:bg-zinc-900"
+            <span
+              v-if="canSeePnl && entry.pnl != null"
+              :class="['text-xs font-semibold tabular-nums', pnlClass(entry.pnl)]"
             >
-              <div class="text-[10px] font-medium uppercase tracking-wide text-zinc-400">PnL</div>
-              <div :class="['mt-0.5 text-xl font-semibold tabular-nums', pnlClass(entry.pnl)]">
-                {{ formatPnl(entry.pnl) }}
-              </div>
-            </div>
+              PnL {{ formatPnl(entry.pnl) }}
+            </span>
           </div>
+
+          <h1 class="text-xl font-bold tracking-tight break-words sm:text-2xl lg:text-3xl">
+            {{ headline }}
+          </h1>
         </header>
 
         <section
           v-if="(entry.note ?? '').trim()"
-          class="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
+          class="shrink-0 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:p-5"
         >
-          <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">Note</h2>
+          <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">Note</h2>
           <p class="whitespace-pre-wrap text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
             {{ entry.note }}
           </p>
         </section>
 
-        <section class="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#1976D2]">HTF</h2>
-          <dl class="mb-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-            <div>
-              <dt class="text-[10px] uppercase text-zinc-400">CTC</dt>
-              <dd>{{ formatFlag(entry.htfCtc) }}</dd>
+        <div
+          class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:min-h-0 lg:flex-1"
+          :class="timeframeHasLtf(entry.timeframe) ? 'lg:grid-cols-3' : 'lg:grid-cols-2'"
+        >
+          <section class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 lg:flex lg:min-h-0 lg:flex-col">
+            <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#1976D2]">HTF</h2>
+            <dl class="mb-3 grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <dt class="text-[10px] uppercase text-zinc-400">CTC</dt>
+                <dd>
+                  <span v-if="entry.htfCtc" :class="[chipBase, chipClass(entry.htfCtc)]">{{ formatFlag(entry.htfCtc) }}</span>
+                  <span v-else class="text-zinc-400">—</span>
+                </dd>
+              </div>
+              <div>
+                <dt class="text-[10px] uppercase text-zinc-400">Bias</dt>
+                <dd>
+                  <span v-if="entry.htfBias" :class="[chipBase, chipClass(entry.htfBias)]">{{ formatFlag(entry.htfBias) }}</span>
+                  <span v-else class="text-zinc-400">—</span>
+                </dd>
+              </div>
+              <div>
+                <dt class="text-[10px] uppercase text-zinc-400">PDA</dt>
+                <dd>{{ entry.htfPda || '—' }}</dd>
+              </div>
+              <div>
+                <dt class="text-[10px] uppercase text-zinc-400">DOL</dt>
+                <dd>{{ entry.htfDol || '—' }}</dd>
+              </div>
+            </dl>
+            <div v-if="entry.htfImages?.length" class="grid gap-2 lg:min-h-0 lg:flex-1 lg:overflow-auto">
+              <button
+                v-for="(img, i) in entry.htfImages"
+                :key="img.id"
+                type="button"
+                class="block w-full cursor-zoom-in overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-950"
+                @click="openImages(img)"
+              >
+                <img :src="img.imageUrl" :alt="`HTF ${i + 1}`" class="mx-auto max-h-[42vh] w-full object-contain lg:max-h-none" />
+              </button>
             </div>
-            <div>
-              <dt class="text-[10px] uppercase text-zinc-400">Bias</dt>
-              <dd>{{ formatFlag(entry.htfBias) }}</dd>
-            </div>
-            <div>
-              <dt class="text-[10px] uppercase text-zinc-400">PDA</dt>
-              <dd>{{ entry.htfPda || '—' }}</dd>
-            </div>
-            <div>
-              <dt class="text-[10px] uppercase text-zinc-400">DOL</dt>
-              <dd>{{ entry.htfDol || '—' }}</dd>
-            </div>
-          </dl>
-          <div v-if="entry.htfImages?.length" class="grid gap-3">
-            <button
-              v-for="(img, i) in entry.htfImages"
-              :key="img.id"
-              type="button"
-              class="block w-full cursor-zoom-in overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-950"
-              @click="openImages(entry.htfImages, i)"
-            >
-              <img :src="img.imageUrl" :alt="`HTF ${i + 1}`" class="mx-auto max-h-[50vh] w-full object-contain" />
-            </button>
-          </div>
-        </section>
+          </section>
 
-        <section class="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#1976D2]">MTF</h2>
-          <dl class="mb-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-            <div>
-              <dt class="text-[10px] uppercase text-zinc-400">CTC</dt>
-              <dd>{{ formatFlag(entry.mtfCtc) }}</dd>
+          <section class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 lg:flex lg:min-h-0 lg:flex-col">
+            <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#1976D2]">MTF</h2>
+            <dl class="mb-3 grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <dt class="text-[10px] uppercase text-zinc-400">CTC</dt>
+                <dd>
+                  <span v-if="entry.mtfCtc" :class="[chipBase, chipClass(entry.mtfCtc)]">{{ formatFlag(entry.mtfCtc) }}</span>
+                  <span v-else class="text-zinc-400">—</span>
+                </dd>
+              </div>
+              <div>
+                <dt class="text-[10px] uppercase text-zinc-400">PDA</dt>
+                <dd>{{ entry.mtfPda || '—' }}</dd>
+              </div>
+              <div>
+                <dt class="text-[10px] uppercase text-zinc-400">Model</dt>
+                <dd>
+                  <span v-if="entry.mtfModel" :class="[chipBase, chipClass(entry.mtfModel)]">{{ entry.mtfModel }}</span>
+                  <span v-else class="text-zinc-400">—</span>
+                </dd>
+              </div>
+              <div>
+                <dt class="text-[10px] uppercase text-zinc-400">Flags</dt>
+                <dd class="flex flex-wrap gap-1">
+                  <span v-if="entry.mtfSweep" :class="[chipBase, chipClass('sweep')]">Sweep</span>
+                  <span v-if="entry.mtfCisd" :class="[chipBase, chipClass('cisd')]">CISD</span>
+                  <span v-if="entry.mtfMss" :class="[chipBase, chipClass('mss')]">MSS</span>
+                  <span v-if="!entry.mtfSweep && !entry.mtfCisd && !entry.mtfMss" class="text-zinc-400">—</span>
+                </dd>
+              </div>
+            </dl>
+            <div v-if="entry.mtfImages?.length" class="grid gap-2 lg:min-h-0 lg:flex-1 lg:overflow-auto">
+              <button
+                v-for="(img, i) in entry.mtfImages"
+                :key="img.id"
+                type="button"
+                class="block w-full cursor-zoom-in overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-950"
+                @click="openImages(img)"
+              >
+                <img :src="img.imageUrl" :alt="`MTF ${i + 1}`" class="mx-auto max-h-[42vh] w-full object-contain lg:max-h-none" />
+              </button>
             </div>
-            <div>
-              <dt class="text-[10px] uppercase text-zinc-400">PDA</dt>
-              <dd>{{ entry.mtfPda || '—' }}</dd>
-            </div>
-            <div>
-              <dt class="text-[10px] uppercase text-zinc-400">Model</dt>
-              <dd>{{ entry.mtfModel || '—' }}</dd>
-            </div>
-            <div>
-              <dt class="text-[10px] uppercase text-zinc-400">Flags</dt>
-              <dd>{{ [entry.mtfSweep && 'Sweep', entry.mtfCisd && 'CISD', entry.mtfMss && 'MSS'].filter(Boolean).join(', ') || '—' }}</dd>
-            </div>
-          </dl>
-          <div v-if="entry.mtfImages?.length" class="grid gap-3">
-            <button
-              v-for="(img, i) in entry.mtfImages"
-              :key="img.id"
-              type="button"
-              class="block w-full cursor-zoom-in overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-950"
-              @click="openImages(entry.mtfImages, i)"
-            >
-              <img :src="img.imageUrl" :alt="`MTF ${i + 1}`" class="mx-auto max-h-[50vh] w-full object-contain" />
-            </button>
-          </div>
-        </section>
+          </section>
 
-        <section class="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-          <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#1976D2]">LTF</h2>
-          <dl class="mb-4 grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <dt class="text-[10px] uppercase text-zinc-400">Flags</dt>
-              <dd>{{ [entry.ltfSweep && 'Sweep', entry.ltfCisd && 'CISD', entry.ltfMss && 'MSS'].filter(Boolean).join(', ') || '—' }}</dd>
+          <section
+            v-if="timeframeHasLtf(entry.timeframe)"
+            class="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 md:col-span-2 lg:col-span-1 lg:flex lg:min-h-0 lg:flex-col"
+          >
+            <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-[#1976D2]">LTF</h2>
+            <dl class="mb-3 grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <dt class="text-[10px] uppercase text-zinc-400">Flags</dt>
+                <dd class="flex flex-wrap gap-1">
+                  <span v-if="entry.ltfSweep" :class="[chipBase, chipClass('sweep')]">Sweep</span>
+                  <span v-if="entry.ltfCisd" :class="[chipBase, chipClass('cisd')]">CISD</span>
+                  <span v-if="entry.ltfMss" :class="[chipBase, chipClass('mss')]">MSS</span>
+                  <span v-if="!entry.ltfSweep && !entry.ltfCisd && !entry.ltfMss" class="text-zinc-400">—</span>
+                </dd>
+              </div>
+              <div class="col-span-2">
+                <dt class="text-[10px] uppercase text-zinc-400">Entry</dt>
+                <dd class="whitespace-pre-wrap">{{ entry.ltfEntry || '—' }}</dd>
+              </div>
+            </dl>
+            <div v-if="entry.ltfImages?.length" class="grid gap-2 lg:min-h-0 lg:flex-1 lg:overflow-auto">
+              <button
+                v-for="(img, i) in entry.ltfImages"
+                :key="img.id"
+                type="button"
+                class="block w-full cursor-zoom-in overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-950"
+                @click="openImages(img)"
+              >
+                <img :src="img.imageUrl" :alt="`LTF ${i + 1}`" class="mx-auto max-h-[42vh] w-full object-contain lg:max-h-none" />
+              </button>
             </div>
-            <div class="col-span-2">
-              <dt class="text-[10px] uppercase text-zinc-400">Entry</dt>
-              <dd class="whitespace-pre-wrap">{{ entry.ltfEntry || '—' }}</dd>
-            </div>
-          </dl>
-          <div v-if="entry.ltfImages?.length" class="grid gap-3">
-            <button
-              v-for="(img, i) in entry.ltfImages"
-              :key="img.id"
-              type="button"
-              class="block w-full cursor-zoom-in overflow-hidden rounded-lg bg-zinc-100 dark:bg-zinc-950"
-              @click="openImages(entry.ltfImages, i)"
-            >
-              <img :src="img.imageUrl" :alt="`LTF ${i + 1}`" class="mx-auto max-h-[50vh] w-full object-contain" />
-            </button>
-          </div>
-        </section>
+          </section>
+        </div>
 
         <section
           v-if="entry.tags.length > 0"
-          class="rounded-xl border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"
+          class="shrink-0 rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 sm:p-5"
         >
           <h2 class="mb-3 text-xs font-semibold uppercase tracking-wide text-zinc-400">Tags</h2>
           <div class="flex flex-wrap gap-1.5">
@@ -303,7 +352,7 @@ watch([entryId, journalSlug], loadEntry)
           </div>
         </section>
 
-        <footer class="border-t border-zinc-200 pt-6 text-center text-xs text-zinc-400 dark:border-zinc-800">
+        <footer class="border-t border-zinc-200 pt-6 text-center text-xs text-zinc-400 dark:border-zinc-800 lg:hidden">
           Trading Journal · Chỉ xem
         </footer>
       </article>
@@ -315,6 +364,10 @@ watch([entryId, journalSlug], loadEntry)
       :start-index="lightboxIndex"
       alt="Chart"
       @close="showLightbox = false"
-    />
+    >
+      <template #caption="{ index }">
+        <LightboxCaption v-if="entry" :entry="entry" :slot="allDetailImages[index]?.slot" />
+      </template>
+    </ImageLightbox>
   </div>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
 import type { JournalEntry, SortDirection, SortField, TradeResult } from '@/types/journal'
+import { timeframeHasLtf } from '@/types/journal'
 import ImagesCell from './ImagesCell.vue'
 import { isoToDisplay } from '@/utils/date'
 
@@ -83,8 +84,11 @@ function formatNum(value: number | null) {
 }
 
 function allImages(entry: JournalEntry) {
-  if (entry.images?.length) return entry.images
-  return [...(entry.htfImages ?? []), ...(entry.mtfImages ?? []), ...(entry.ltfImages ?? [])]
+  const images = entry.images?.length
+    ? entry.images
+    : [...(entry.htfImages ?? []), ...(entry.mtfImages ?? []), ...(entry.ltfImages ?? [])]
+  if (!timeframeHasLtf(entry.timeframe)) return images.filter((img) => img.slot !== 'ltf')
+  return images
 }
 
 function noteText(entry: JournalEntry) {
@@ -112,6 +116,7 @@ function noteText(entry: JournalEntry) {
                   Pair <span class="text-[9px]">{{ sortMark('pair', sortField, sortDirection) }}</span>
                 </button>
               </th>
+              <th class="w-[100px] px-1.5 py-1.5">Timeframe</th>
               <th class="w-[120px] px-1.5 py-1.5">
                 <button type="button" :class="[sortableTh, thClass('session', sortField)]" @click="emit('sort', 'session')">
                   Session <span class="text-[9px]">{{ sortMark('session', sortField, sortDirection) }}</span>
@@ -163,6 +168,15 @@ function noteText(entry: JournalEntry) {
               <td class="whitespace-nowrap px-1.5 py-1.5 text-xs font-medium uppercase">
                 {{ entry.pair || '—' }}
               </td>
+              <td class="whitespace-nowrap px-1.5 py-1.5">
+                <span
+                  v-if="entry.timeframe"
+                  class="inline-flex rounded-full bg-zinc-950 px-2 py-0.5 text-[10px] font-medium text-white"
+                >
+                  {{ entry.timeframe }}
+                </span>
+                <span v-else class="text-xs text-zinc-400">—</span>
+              </td>
               <td class="whitespace-nowrap px-1.5 py-1.5 text-xs text-zinc-600 dark:text-zinc-300">
                 {{ entry.session || '—' }}
               </td>
@@ -198,6 +212,7 @@ function noteText(entry: JournalEntry) {
               <td class="min-w-[140px] w-[140px] align-middle px-0.5 py-1" @click.stop>
                 <ImagesCell
                   :entry-id="entry.id"
+                  :entry="entry"
                   :images="allImages(entry)"
                   readonly
                 />
@@ -340,6 +355,7 @@ function noteText(entry: JournalEntry) {
 
         <div class="mb-2 flex flex-wrap items-center gap-2 text-xs">
           <span class="text-zinc-500">{{ entry.session || '—' }}</span>
+          <span v-if="entry.timeframe" class="rounded-full bg-zinc-950 px-2 py-0.5 text-[10px] font-medium text-white">{{ entry.timeframe }}</span>
           <span
             v-if="entry.result"
             class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium"
@@ -363,6 +379,7 @@ function noteText(entry: JournalEntry) {
         <div @click.stop>
           <ImagesCell
             :entry-id="entry.id"
+            :entry="entry"
             :images="allImages(entry)"
             readonly
           />

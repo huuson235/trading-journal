@@ -124,7 +124,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 
         <p
           v-if="hasMultiple"
-          class="absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full bg-black/40 px-2.5 py-0.5 text-xs tabular-nums text-white/90"
+          class="absolute bottom-2 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/40 px-2.5 py-0.5 text-xs tabular-nums text-white/90"
         >
           {{ currentIndex + 1 }} / {{ sources.length }}
         </p>
@@ -135,7 +135,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
           v-else-if="loadedSrc"
           :src="loadedSrc"
           :alt="alt ?? 'Chart'"
-          class="max-h-[90vh] max-w-full rounded-lg object-contain shadow-2xl"
+          class="max-h-[82vh] max-w-full rounded-lg object-contain shadow-2xl"
           @click.stop
         />
       </div>
@@ -157,6 +157,16 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
         </span>
       </div>
       <div v-else class="w-[18%] min-w-[48px] max-w-[120px] shrink-0" />
+
+      <div
+        v-if="$slots.caption"
+        class="pointer-events-auto absolute top-5 left-1/2 z-20 w-[min(92vw,42rem)] -translate-x-1/2 px-3"
+        @click.stop
+      >
+        <div class="rounded-lg bg-black/80 px-4 py-2.5 text-center text-sm text-white shadow-lg backdrop-blur-sm">
+          <slot name="caption" :index="currentIndex" />
+        </div>
+      </div>
     </div>
   </Teleport>
 </template>

@@ -1,4 +1,4 @@
-export type Session = 'London' | 'Asia' | 'New York AM' | 'New York PM' | 'No session'
+export type Timeframe = 'W-H4-M15' | 'D-H1-M5' | 'MARCO' | 'SWING-H4' | 'SWING-H1' | ''
 export type TradeResult = 'Take profit' | 'Stop loss' | 'BE' | ''
 export type Ctc = 'bullish' | 'bearish' | 'sideways' | ''
 export type Bias = 'bullish' | 'bearish' | 'no_bias' | ''
@@ -19,6 +19,7 @@ export interface JournalEntry {
   date: string
   createdAt: string
   session: Session
+  timeframe: Timeframe
   pair: string
   direction: Direction
   rrIdea: number | null
@@ -43,6 +44,7 @@ export interface JournalEntry {
   ltfCisd: boolean
   ltfMss: boolean
   ltfEntry: string
+  ltfExist: boolean
   htfImages: EntryImage[]
   mtfImages: EntryImage[]
   ltfImages: EntryImage[]
@@ -50,6 +52,12 @@ export interface JournalEntry {
 }
 
 export const SESSIONS: Session[] = ['London', 'Asia', 'New York AM', 'New York PM', 'No session']
+export const TIMEFRAMES: Exclude<Timeframe, ''>[] = ['W-H4-M15', 'D-H1-M5', 'MARCO', 'SWING-H4', 'SWING-H1']
+export const SWING_TIMEFRAMES: Exclude<Timeframe, ''>[] = ['SWING-H4', 'SWING-H1']
+
+export function timeframeHasLtf(timeframe: Timeframe | string | null | undefined) {
+  return !SWING_TIMEFRAMES.includes(timeframe as Exclude<Timeframe, ''>)
+}
 export const RESULTS: Exclude<TradeResult, ''>[] = ['Take profit', 'Stop loss', 'BE']
 export const CTC_OPTIONS: Exclude<Ctc, ''>[] = ['bullish', 'bearish', 'sideways']
 export const BIAS_OPTIONS: Exclude<Bias, ''>[] = ['bullish', 'bearish', 'no_bias']

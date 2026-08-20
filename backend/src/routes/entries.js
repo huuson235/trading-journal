@@ -36,6 +36,7 @@ function entryPayload(body, existing = null) {
   return {
     date: body.date ?? existing?.date,
     session: body.session ?? existing?.session,
+    timeframe: body.timeframe !== undefined ? body.timeframe : existing?.timeframe ?? '',
     pair: body.pair ?? existing?.pair ?? '',
     direction: body.direction ?? existing?.direction,
     rrIdea: body.rrIdea ?? body.rrPlan ?? body.rr ?? existing?.rrIdea ?? null,
@@ -64,6 +65,7 @@ function entryPayload(body, existing = null) {
     ltfCisd: body.ltfCisd ?? existing?.ltfCisd ?? false,
     ltfMss: body.ltfMss ?? existing?.ltfMss ?? false,
     ltfEntry: body.ltfEntry ?? existing?.ltfEntry ?? '',
+    ltfExist: body.ltfExist !== undefined ? body.ltfExist : existing?.ltfExist ?? true,
   }
 }
 
