@@ -25,6 +25,7 @@ export function toEntryBody(entry: Partial<TradePayload>) {
   return {
     date: entry.date,
     session: entry.session,
+    timeframe: entry.timeframe,
     pair: entry.pair,
     direction: entry.direction,
     rrIdea: entry.rrIdea,
@@ -49,6 +50,7 @@ export function toEntryBody(entry: Partial<TradePayload>) {
     ltfCisd: entry.ltfCisd,
     ltfMss: entry.ltfMss,
     ltfEntry: entry.ltfEntry,
+    ltfExist: entry.ltfExist,
   }
 }
 

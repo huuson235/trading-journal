@@ -15,6 +15,8 @@ const RESULTS = ['Take profit', 'Stop loss', 'BE']
 const CTC_VALUES = ['bullish', 'bearish', 'sideways']
 const BIAS_VALUES = ['bullish', 'bearish', 'no_bias']
 const MTF_MODELS = ['CRT', 'I-E', 'E-E', 'Unicorn']
+const TIMEFRAMES = ['W-H4-M15', 'D-H1-M5', 'MARCO', 'SWING-H4', 'SWING-H1']
+const SWING_TIMEFRAMES = ['SWING-H4', 'SWING-H1']
 
 const SESSION_ALIASES = {
   Asia: 'Asia',
@@ -45,6 +47,8 @@ const NEW_ENTRY_COLUMNS = [
   ['ltf_cisd', 'INTEGER NOT NULL DEFAULT 0'],
   ['ltf_mss', 'INTEGER NOT NULL DEFAULT 0'],
   ['ltf_entry', "TEXT NOT NULL DEFAULT ''"],
+  ['ltf_exist', 'INTEGER NOT NULL DEFAULT 1'],
+  ['timeframe', "TEXT NOT NULL DEFAULT ''"],
 ]
 
 function normalizeTag(value) {
@@ -94,6 +98,10 @@ function pickAllowed(value, allowed) {
   if (!raw) return ''
   const found = allowed.find((item) => item.toLowerCase() === raw.toLowerCase())
   return found ?? ''
+}
+
+function timeframeHasLtf(timeframe) {
+  return !SWING_TIMEFRAMES.includes(timeframe)
 }
 
 function normalizeSession(value) {
@@ -168,6 +176,8 @@ function createJournalStore(slug) {
       ltf_cisd INTEGER NOT NULL DEFAULT 0,
       ltf_mss INTEGER NOT NULL DEFAULT 0,
       ltf_entry TEXT NOT NULL DEFAULT '',
+      ltf_exist INTEGER NOT NULL DEFAULT 1,
+      timeframe TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
@@ -396,12 +406,14 @@ function createJournalStore(slug) {
     const grouped = groupImages(images)
     const rrIdea = normalizeNumber(row.rr_idea ?? row.rr_plan ?? row.rr)
     const rrReal = normalizeNumber(row.rr_real ?? row.rr_reality)
+    const timeframe = pickAllowed(row.timeframe, TIMEFRAMES)
     return {
       id: row.id,
       no: row.no,
       date: row.date,
       createdAt: row.created_at,
       session: normalizeSession(row.session),
+      timeframe,
       pair: String(row.pair ?? '').toUpperCase(),
       direction: normalizeDirection(row.direction),
       rrIdea,
@@ -428,6 +440,7 @@ function createJournalStore(slug) {
       ltfCisd: Boolean(row.ltf_cisd ?? 0),
       ltfMss: Boolean(row.ltf_mss ?? 0),
       ltfEntry: String(row.ltf_entry ?? ''),
+      ltfExist: timeframeHasLtf(timeframe),
       htfImages: grouped.htf,
       mtfImages: grouped.mtf,
       ltfImages: grouped.ltf,
@@ -463,9 +476,12 @@ function createJournalStore(slug) {
     const pnl = data.pnl !== undefined ? normalizeNumber(data.pnl) : existing ? existing.pnl : null
     const resultSource =
       data.result !== undefined ? data.result : existing ? existing.result : ''
+    const timeframe = pickAllowed(data.timeframe ?? existing?.timeframe, TIMEFRAMES)
+    const ltfExist = timeframeHasLtf(timeframe)
     return {
       date: data.date ?? existing?.date,
       session: normalizeSession(data.session ?? existing?.session),
+      timeframe,
       pair: String(data.pair ?? existing?.pair ?? '').trim().toUpperCase(),
       direction: normalizeDirection(data.direction ?? existing?.direction),
       rrIdea,
@@ -490,6 +506,7 @@ function createJournalStore(slug) {
       ltfCisd: normalizeBool(data.ltfCisd ?? existing?.ltfCisd),
       ltfMss: normalizeBool(data.ltfMss ?? existing?.ltfMss),
       ltfEntry: String(data.ltfEntry ?? existing?.ltfEntry ?? ''),
+      ltfExist,
     }
   }
 
@@ -519,9 +536,9 @@ function createJournalStore(slug) {
           checklist, pnl, result, note, tags, visible,
           htf_ctc, htf_bias, htf_pda, htf_dol,
           mtf_ctc, mtf_pda, mtf_model, mtf_sweep, mtf_cisd, mtf_mss,
-          ltf_sweep, ltf_cisd, ltf_mss, ltf_entry
+          ltf_sweep, ltf_cisd, ltf_mss, ltf_entry, ltf_exist, timeframe
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
       const result = stmt.run(
         maxNo + 1,
@@ -554,6 +571,8 @@ function createJournalStore(slug) {
         values.ltfCisd ? 1 : 0,
         values.ltfMss ? 1 : 0,
         values.ltfEntry,
+        values.ltfExist ? 1 : 0,
+        values.timeframe,
       )
       return this.getEntryById(Number(result.lastInsertRowid))
     },
@@ -571,7 +590,7 @@ function createJournalStore(slug) {
           checklist = ?, pnl = ?, result = ?, note = ?, tags = ?, visible = ?,
           htf_ctc = ?, htf_bias = ?, htf_pda = ?, htf_dol = ?,
           mtf_ctc = ?, mtf_pda = ?, mtf_model = ?, mtf_sweep = ?, mtf_cisd = ?, mtf_mss = ?,
-          ltf_sweep = ?, ltf_cisd = ?, ltf_mss = ?, ltf_entry = ?,
+          ltf_sweep = ?, ltf_cisd = ?, ltf_mss = ?, ltf_entry = ?, ltf_exist = ?, timeframe = ?,
           updated_at = datetime('now')
         WHERE id = ?
       `).run(
@@ -604,6 +623,8 @@ function createJournalStore(slug) {
         values.ltfCisd ? 1 : 0,
         values.ltfMss ? 1 : 0,
         values.ltfEntry,
+        values.ltfExist ? 1 : 0,
+        values.timeframe,
         id,
       )
       return this.getEntryById(id)

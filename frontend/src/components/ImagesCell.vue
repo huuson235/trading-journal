@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { EntryImage } from '@/types/journal'
+import type { EntryImage, JournalEntry } from '@/types/journal'
 import ImageLightbox from './ImageLightbox.vue'
+import LightboxCaption from './LightboxCaption.vue'
 
 const props = defineProps<{
   entryId: number
   images: EntryImage[]
+  entry?: JournalEntry
   readonly?: boolean
   uploadHandler?: (entryId: number, file: File) => Promise<void>
   removeImageHandler?: (entryId: number, imageId: number) => Promise<void>
@@ -127,6 +129,10 @@ function openLightbox(index: number) {
       :start-index="lightboxIndex"
       alt="Chart"
       @close="showLightbox = false"
-    />
+    >
+      <template v-if="entry" #caption="{ index }">
+        <LightboxCaption :entry="entry" :slot="images[index]?.slot" />
+      </template>
+    </ImageLightbox>
   </div>
 </template>

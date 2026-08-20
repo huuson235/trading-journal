@@ -7,10 +7,11 @@ import type {
   JournalEntry,
   MtfModel,
   Session,
+  Timeframe,
   TradePayload,
   TradeResult,
 } from '@/types/journal'
-import { BIAS_OPTIONS, CTC_OPTIONS, MTF_MODELS, RESULTS, SESSIONS } from '@/types/journal'
+import { BIAS_OPTIONS, CTC_OPTIONS, MTF_MODELS, RESULTS, SESSIONS, TIMEFRAMES, timeframeHasLtf } from '@/types/journal'
 import type { SlotFiles } from '@/composables/useJournal'
 import { todayIso } from '@/utils/date'
 import DateInput from './DateInput.vue'
@@ -37,6 +38,7 @@ interface FormState {
   rrReal: string
   pnl: string
   session: Session | ''
+  timeframe: Timeframe
   result: TradeResult
   note: string
   htfCtc: Ctc
@@ -63,6 +65,7 @@ function emptyForm(): FormState {
     rrReal: '',
     pnl: '',
     session: '',
+    timeframe: '',
     result: '',
     note: '',
     htfCtc: '',
@@ -90,6 +93,7 @@ function fromEntry(entry: JournalEntry): FormState {
     rrReal: entry.rrReal == null ? '' : String(entry.rrReal),
     pnl: entry.pnl == null ? '' : String(entry.pnl),
     session: entry.session || '',
+    timeframe: entry.timeframe || '',
     result: entry.result || '',
     note: entry.note || '',
     htfCtc: entry.htfCtc || '',
@@ -196,6 +200,7 @@ function onSubmit() {
     rrReal: toNumber(form.rrReal),
     pnl: toNumber(form.pnl),
     session: (form.session || 'No session') as Session,
+    timeframe: form.timeframe,
     result: form.result,
     note: form.note.trim(),
     htfCtc: form.htfCtc,
@@ -212,8 +217,18 @@ function onSubmit() {
     ltfCisd: form.ltfCisd,
     ltfMss: form.ltfMss,
     ltfEntry: form.ltfEntry.trim(),
+    ltfExist: timeframeHasLtf(form.timeframe),
   }
-  emit('save', payload, { htf: [...pending.htf], mtf: [...pending.mtf], ltf: [...pending.ltf] }, [...removedImageIds.value])
+  emit(
+    'save',
+    payload,
+    {
+      htf: [...pending.htf],
+      mtf: [...pending.mtf],
+      ltf: timeframeHasLtf(form.timeframe) ? [...pending.ltf] : [],
+    },
+    [...removedImageIds.value],
+  )
 }
 
 const fieldWrap = 'relative'
@@ -234,7 +249,7 @@ const chevronClass = 'pointer-events-none absolute right-3 top-1/2 z-10 h-4 w-4 
       @click.self="onClose"
     >
       <form
-        class="flex max-h-[100dvh] w-full max-w-[480px] flex-col overflow-hidden bg-[#f5f5f5] shadow-2xl sm:max-h-[92vh] sm:rounded-xl dark:bg-zinc-900"
+        class="flex max-h-[100dvh] w-full flex-col overflow-hidden bg-[#f5f5f5] shadow-2xl sm:max-h-[92vh] sm:rounded-xl md:max-w-[760px] lg:max-w-[1120px] dark:bg-zinc-900"
         @submit.prevent="onSubmit"
       >
         <header class="flex items-center gap-3 bg-[#1976D2] px-4 py-3 text-white">
@@ -246,7 +261,7 @@ const chevronClass = 'pointer-events-none absolute right-3 top-1/2 z-10 h-4 w-4 
 
         <div class="flex-1 space-y-3 overflow-y-auto px-3 py-3 sm:px-4">
           <section class="rounded-lg bg-white p-4 shadow-sm dark:bg-zinc-800">
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div>
                 <label class="label-field">Pair</label>
                 <div :class="fieldWrap">
@@ -326,7 +341,24 @@ const chevronClass = 'pointer-events-none absolute right-3 top-1/2 z-10 h-4 w-4 
                 </div>
               </div>
 
-              <div class="sm:col-span-2">
+              <div>
+                <label class="label-field">Timeframe</label>
+                <div :class="fieldWrap">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :class="iconClass">
+                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                    <path d="M8 2v4M16 2v4M3 10h18" />
+                  </svg>
+                  <select v-model="form.timeframe" :class="selectClass">
+                    <option value="">Chọn timeframe</option>
+                    <option v-for="item in TIMEFRAMES" :key="item" :value="item">{{ item }}</option>
+                  </select>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :class="chevronClass">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </div>
+              </div>
+
+              <div>
                 <label class="label-field">Result</label>
                 <div :class="fieldWrap">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :class="iconClass">
@@ -343,7 +375,7 @@ const chevronClass = 'pointer-events-none absolute right-3 top-1/2 z-10 h-4 w-4 
                 </div>
               </div>
 
-              <div class="sm:col-span-2">
+              <div class="md:col-span-2 lg:col-span-4">
                 <label class="label-field">Note</label>
                 <div class="relative">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="pointer-events-none absolute left-3 top-3 z-10 h-4 w-4 text-gray-400">
@@ -373,7 +405,7 @@ const chevronClass = 'pointer-events-none absolute right-3 top-1/2 z-10 h-4 w-4 
               subtitle="Tải lên ảnh phân tích HTF"
               @remove-existing="removeExisting('htf', $event)"
             />
-            <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div>
                 <label class="label-field">CTC</label>
                 <SegmentedChoice v-model="form.htfCtc" :options="ctcOptions" />
@@ -402,7 +434,7 @@ const chevronClass = 'pointer-events-none absolute right-3 top-1/2 z-10 h-4 w-4 
               subtitle="Tải lên ảnh phân tích MTF"
               @remove-existing="removeExisting('mtf', $event)"
             />
-            <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div>
                 <label class="label-field">CTC</label>
                 <SegmentedChoice v-model="form.mtfCtc" :options="ctcOptions" />
@@ -411,7 +443,7 @@ const chevronClass = 'pointer-events-none absolute right-3 top-1/2 z-10 h-4 w-4 
                 <label class="label-field">PDA</label>
                 <input v-model="form.mtfPda" type="text" placeholder="Nhập PDA" :class="underlineInput" />
               </div>
-              <div class="sm:col-span-2">
+              <div>
                 <label class="label-field">Model</label>
                 <div :class="fieldWrap">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :class="iconClass">
@@ -427,24 +459,27 @@ const chevronClass = 'pointer-events-none absolute right-3 top-1/2 z-10 h-4 w-4 
                   </svg>
                 </div>
               </div>
-            </div>
-            <div class="mt-4 flex flex-wrap gap-5">
-              <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-zinc-200">
-                <input v-model="form.mtfSweep" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-[#1976D2] focus:ring-[#1976D2]" />
-                Sweep
-              </label>
-              <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-zinc-200">
-                <input v-model="form.mtfCisd" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-[#1976D2] focus:ring-[#1976D2]" />
-                CISD
-              </label>
-              <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-zinc-200">
-                <input v-model="form.mtfMss" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-[#1976D2] focus:ring-[#1976D2]" />
-                MSS
-              </label>
+              <div>
+                <label class="label-field">Flags</label>
+                <div class="flex h-[42px] flex-wrap items-center gap-4">
+                  <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-zinc-200">
+                    <input v-model="form.mtfSweep" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-[#1976D2] focus:ring-[#1976D2]" />
+                    Sweep
+                  </label>
+                  <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-zinc-200">
+                    <input v-model="form.mtfCisd" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-[#1976D2] focus:ring-[#1976D2]" />
+                    CISD
+                  </label>
+                  <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-zinc-200">
+                    <input v-model="form.mtfMss" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-[#1976D2] focus:ring-[#1976D2]" />
+                    MSS
+                  </label>
+                </div>
+              </div>
             </div>
           </section>
 
-          <section class="rounded-lg bg-white p-4 shadow-sm dark:bg-zinc-800">
+          <section v-if="timeframeHasLtf(form.timeframe)" class="rounded-lg bg-white p-4 shadow-sm dark:bg-zinc-800">
             <h3 class="mb-3 text-sm font-semibold text-[#1976D2]">LTF</h3>
             <FormImageUpload
               v-model:pending="pending.ltf"
