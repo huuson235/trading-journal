@@ -46,6 +46,12 @@ async function onLogout() {
       <div class="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <h1 class="text-base font-semibold tracking-tight">Trading Journal</h1>
         <div class="flex items-center gap-2">
+          <RouterLink
+            :to="{ name: 'news' }"
+            class="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            Tin tức
+          </RouterLink>
           <template v-if="isAuthenticated">
             <span class="text-xs text-zinc-500">{{ username }}</span>
             <button

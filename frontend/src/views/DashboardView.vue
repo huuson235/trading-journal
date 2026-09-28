@@ -169,6 +169,13 @@ async function onLogout() {
           </button>
 
           <RouterLink
+            :to="{ name: 'news' }"
+            class="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            Tin tức
+          </RouterLink>
+
+          <RouterLink
             v-if="isRoot"
             :to="{ name: 'admin' }"
             class="rounded-lg border border-zinc-200 px-3 py-1.5 text-xs text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"

@@ -3,6 +3,7 @@ import HomeView from '../views/HomeView.vue'
 import DashboardView from '../views/DashboardView.vue'
 import EntryDetailView from '../views/EntryDetailView.vue'
 import AdminAccountsView from '../views/AdminAccountsView.vue'
+import NewsCalendarView from '../views/NewsCalendarView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -11,6 +12,11 @@ const router = createRouter({
       path: '/',
       name: 'home',
       component: HomeView,
+    },
+    {
+      path: '/news',
+      name: 'news',
+      component: NewsCalendarView,
     },
     {
       path: '/admin',

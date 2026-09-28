@@ -7,6 +7,7 @@ import entriesRouter from './routes/entries.js'
 import authRouter from './routes/auth.js'
 import settingsRouter from './routes/settings.js'
 import adminRouter from './routes/admin.js'
+import newsRouter from './routes/news.js'
 import { assertAuthConfig } from './auth.js'
 import { migrateLegacyJournal, USERS_UPLOADS_DIR, isValidSlug } from './accounts.js'
 import { openJournalStore } from './db.js'
@@ -35,6 +36,7 @@ app.use('/uploads/:slug', (req, res, next) => {
 
 app.use('/api/auth', authRouter)
 app.use('/api/admin', adminRouter)
+app.use('/api/news', newsRouter)
 app.use('/api/u/:slug', settingsRouter)
 app.use('/api/u/:slug', entriesRouter)
 
