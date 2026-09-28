@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import { fetchNewsCalendar } from '@/api/news'
 import { resetBackgroundToDefault } from '@/composables/useBackground'
@@ -13,17 +13,71 @@ import {
 
 resetBackgroundToDefault()
 
+const FILTER_STORAGE_KEY = 'news-calendar-filters'
+
+interface StoredFilters {
+  search: string
+  impacts: string[]
+  currencies: string[]
+  day: string
+  onlyUpcoming: boolean
+}
+
+const DEFAULT_FILTERS: StoredFilters = {
+  search: '',
+  impacts: ['High', 'Medium', 'Low'],
+  currencies: ['USD'],
+  day: 'all',
+  onlyUpcoming: false,
+}
+
+function loadStoredFilters(): StoredFilters {
+  try {
+    const raw = localStorage.getItem(FILTER_STORAGE_KEY)
+    if (!raw) return { ...DEFAULT_FILTERS }
+    const parsed = JSON.parse(raw) as Partial<StoredFilters>
+    return {
+      search: typeof parsed.search === 'string' ? parsed.search : DEFAULT_FILTERS.search,
+      impacts: Array.isArray(parsed.impacts) ? parsed.impacts.map(String) : [...DEFAULT_FILTERS.impacts],
+      currencies: Array.isArray(parsed.currencies)
+        ? parsed.currencies.map((c) => String(c).toUpperCase())
+        : [...DEFAULT_FILTERS.currencies],
+      day: typeof parsed.day === 'string' ? parsed.day : DEFAULT_FILTERS.day,
+      onlyUpcoming: typeof parsed.onlyUpcoming === 'boolean' ? parsed.onlyUpcoming : false,
+    }
+  } catch {
+    return { ...DEFAULT_FILTERS }
+  }
+}
+
+const stored = loadStoredFilters()
+
 const events = ref<NewsEvent[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 const fetchedAt = ref<number | null>(null)
 const nowTick = ref(Date.now())
 
-const search = ref('')
-const selectedImpacts = ref<Set<string>>(new Set(['High', 'Medium', 'Low']))
-const selectedCurrencies = ref<Set<string>>(new Set(['USD']))
-const selectedDay = ref<string>('all')
-const onlyUpcoming = ref(false)
+const search = ref(stored.search)
+const selectedImpacts = ref<Set<string>>(new Set(stored.impacts))
+const selectedCurrencies = ref<Set<string>>(new Set(stored.currencies))
+const selectedDay = ref<string>(stored.day)
+const onlyUpcoming = ref(stored.onlyUpcoming)
+
+watch(
+  [search, selectedImpacts, selectedCurrencies, selectedDay, onlyUpcoming],
+  () => {
+    const payload: StoredFilters = {
+      search: search.value,
+      impacts: [...selectedImpacts.value],
+      currencies: [...selectedCurrencies.value],
+      day: selectedDay.value,
+      onlyUpcoming: onlyUpcoming.value,
+    }
+    localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(payload))
+  },
+  { deep: true },
+)
 
 let tickTimer: ReturnType<typeof setInterval> | null = null
 
@@ -45,6 +99,13 @@ async function load() {
     const data = await fetchNewsCalendar()
     events.value = data.events
     fetchedAt.value = data.fetchedAt
+    // Ngày đã lưu có thể hết hạn khi sang tuần mới
+    if (
+      selectedDay.value !== 'all' &&
+      !dayOptions.value.some((d) => d.key === selectedDay.value)
+    ) {
+      selectedDay.value = 'all'
+    }
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Không tải được tin tức'
   } finally {
@@ -231,11 +292,11 @@ function selectMajorCurrencies() {
 }
 
 function resetFilters() {
-  search.value = ''
-  selectedImpacts.value = new Set(['High', 'Medium', 'Low'])
-  selectedCurrencies.value = new Set(['USD'])
-  selectedDay.value = 'all'
-  onlyUpcoming.value = false
+  search.value = DEFAULT_FILTERS.search
+  selectedImpacts.value = new Set(DEFAULT_FILTERS.impacts)
+  selectedCurrencies.value = new Set(DEFAULT_FILTERS.currencies)
+  selectedDay.value = DEFAULT_FILTERS.day
+  onlyUpcoming.value = DEFAULT_FILTERS.onlyUpcoming
 }
 
 function fetchedLabel(): string {
