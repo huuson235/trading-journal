@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
+import CurrencyFlag from '@/components/CurrencyFlag.vue'
+import ImpactStars from '@/components/ImpactStars.vue'
 import { fetchNewsCalendar } from '@/api/news'
 import { resetBackgroundToDefault } from '@/composables/useBackground'
 import {
   IMPACT_OPTIONS,
-  currencyFlag,
   currencyName,
   type NewsEvent,
   type NewsImpact,
@@ -218,36 +219,6 @@ function formatTime(iso: string): string {
   return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
-function impactClass(impact: NewsImpact): string {
-  switch (normalizeImpact(impact)) {
-    case 'High':
-      return 'bg-red-600'
-    case 'Medium':
-      return 'bg-orange-300'
-    case 'Low':
-      return 'bg-emerald-500'
-    case 'Holiday':
-      return 'bg-sky-400'
-    default:
-      return 'bg-zinc-300'
-  }
-}
-
-function impactLabel(impact: NewsImpact): string {
-  switch (normalizeImpact(impact)) {
-    case 'High':
-      return 'Cao'
-    case 'Medium':
-      return 'Trung bình'
-    case 'Low':
-      return 'Thấp'
-    case 'Holiday':
-      return 'Nghỉ lễ'
-    default:
-      return String(impact)
-  }
-}
-
 function displayValue(value: string | undefined): string {
   const v = (value ?? '').trim()
   return v || '—'
@@ -313,19 +284,20 @@ function fetchedLabel(): string {
     <header
       class="sticky top-0 z-20 border-b border-zinc-200 bg-white/85 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-950/85"
     >
-      <div class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+      <div class="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-2 sm:gap-3 sm:px-6 sm:py-3">
         <div class="min-w-0">
-          <h1 class="truncate text-base font-semibold tracking-tight">Economic Calendar</h1>
-          <p class="truncate text-[11px] text-zinc-400">
+          <h1 class="truncate text-sm font-semibold tracking-tight sm:text-base">Economic Calendar</h1>
+          <p class="truncate text-[10px] text-zinc-400 sm:text-[11px]">
             Tin tức tuần này
             <span v-if="fetchedAt">· cập nhật {{ fetchedLabel() }}</span>
           </p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1.5 sm:gap-2">
           <button
             type="button"
-            class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2.5 text-xs text-zinc-600 transition hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
+            class="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-600 transition hover:bg-zinc-50 sm:h-8 sm:w-auto sm:gap-1.5 sm:px-2.5 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800"
             :disabled="loading"
+            :aria-label="'Làm mới'"
             @click="load"
           >
             <svg
@@ -340,27 +312,27 @@ function fetchedLabel(): string {
               <path d="M21 12a9 9 0 1 1-2.64-6.36" />
               <path d="M21 3v6h-6" />
             </svg>
-            Làm mới
+            <span class="hidden text-xs sm:inline">Làm mới</span>
           </button>
           <ThemeToggle />
         </div>
       </div>
     </header>
 
-    <main class="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-6">
+    <main class="mx-auto max-w-6xl px-3 py-3 sm:px-6 sm:py-6">
       <!-- Filters -->
       <section
-        class="mb-5 space-y-3 rounded-xl border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:p-4"
+        class="mb-3 space-y-2 rounded-xl border border-zinc-200 bg-white p-2.5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 sm:mb-5 sm:space-y-3 sm:p-4"
       >
-        <div class="flex flex-wrap items-center gap-2">
-          <div class="relative min-w-[200px] flex-1">
+        <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          <div class="relative min-w-0 flex-1 basis-full sm:min-w-[200px] sm:basis-auto">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               stroke-width="2"
-              class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400"
+              class="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400"
             >
               <circle cx="11" cy="11" r="7" />
               <path d="m20 20-3-3" />
@@ -369,13 +341,13 @@ function fetchedLabel(): string {
               v-model="search"
               type="search"
               placeholder="Tìm sự kiện, currency..."
-              class="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-2 pl-8 pr-3 text-sm outline-none ring-indigo-500/30 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-950"
+              class="w-full rounded-lg border border-zinc-200 bg-zinc-50 py-1.5 pl-7 pr-2 text-xs outline-none ring-indigo-500/30 focus:ring-2 dark:border-zinc-700 dark:bg-zinc-950 sm:py-2 sm:pl-8 sm:pr-3 sm:text-sm"
             />
           </div>
 
           <select
             v-model="selectedDay"
-            class="rounded-lg border border-zinc-200 bg-white px-2.5 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-950"
+            class="rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-[11px] dark:border-zinc-700 dark:bg-zinc-950 sm:px-2.5 sm:py-2 sm:text-xs"
           >
             <option value="all">Tất cả ngày</option>
             <option v-for="day in dayOptions" :key="day.key" :value="day.key">
@@ -384,49 +356,48 @@ function fetchedLabel(): string {
           </select>
 
           <label
-            class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-200 px-2.5 py-2 text-xs dark:border-zinc-700"
+            class="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-zinc-200 px-2 py-1.5 text-[11px] dark:border-zinc-700 sm:gap-2 sm:px-2.5 sm:py-2 sm:text-xs"
           >
             <input v-model="onlyUpcoming" type="checkbox" class="rounded border-zinc-300" />
-            Chỉ sắp tới
+            Sắp tới
           </label>
 
           <button
             type="button"
-            class="rounded-lg border border-zinc-200 px-2.5 py-2 text-xs text-zinc-500 transition hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+            class="rounded-lg border border-zinc-200 px-2 py-1.5 text-[11px] text-zinc-500 transition hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800 sm:px-2.5 sm:py-2 sm:text-xs"
             @click="resetFilters"
           >
-            Reset filter
+            Reset
           </button>
         </div>
 
         <!-- Impact -->
         <div>
-          <div class="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
-            Mức ảnh hưởng
+          <div class="mb-1 text-[9px] font-medium uppercase tracking-wide text-zinc-400 sm:mb-1.5 sm:text-[10px]">
+            Impact
           </div>
-          <div class="flex flex-wrap gap-1.5">
+          <div class="flex flex-wrap gap-1 sm:gap-1.5">
             <button
               v-for="impact in IMPACT_OPTIONS"
               :key="impact"
               type="button"
-              class="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition"
+              class="inline-flex items-center gap-1 rounded-md border px-1.5 py-1 transition sm:gap-1.5 sm:rounded-lg sm:px-2.5 sm:py-1.5"
               :class="
                 selectedImpacts.has(impact)
-                  ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
-                  : 'border-zinc-200 text-zinc-500 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800'
+                  ? 'border-indigo-300 bg-indigo-50 dark:border-indigo-700 dark:bg-indigo-950/40'
+                  : 'border-zinc-200 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:bg-zinc-800'
               "
               @click="toggleImpact(impact)"
             >
-              <span class="inline-block h-2.5 w-2.5 rounded-sm" :class="impactClass(impact)" />
-              {{ impactLabel(impact) }}
+              <ImpactStars :impact="impact" :size="11" />
             </button>
           </div>
         </div>
 
         <!-- Currencies -->
         <div>
-          <div class="mb-1.5 flex flex-wrap items-center gap-2">
-            <span class="text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+          <div class="mb-1 flex flex-wrap items-center gap-2 sm:mb-1.5">
+            <span class="text-[9px] font-medium uppercase tracking-wide text-zinc-400 sm:text-[10px]">
               Currency
             </span>
             <button
@@ -451,12 +422,12 @@ function fetchedLabel(): string {
               Bỏ chọn
             </button>
           </div>
-          <div class="flex flex-wrap gap-1.5">
+          <div class="flex flex-wrap gap-1 sm:gap-1.5">
             <button
               v-for="code in availableCurrencies"
               :key="code"
               type="button"
-              class="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs transition"
+              class="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] transition sm:rounded-lg sm:px-2 sm:py-1 sm:text-xs"
               :class="
                 selectedCurrencies.has(code)
                   ? 'border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300'
@@ -465,7 +436,7 @@ function fetchedLabel(): string {
               :title="currencyName(code)"
               @click="toggleCurrency(code)"
             >
-              <span class="text-sm leading-none">{{ currencyFlag(code) }}</span>
+              <CurrencyFlag :code="code" :size="12" />
               <span class="font-medium">{{ code }}</span>
             </button>
             <span
@@ -477,26 +448,30 @@ function fetchedLabel(): string {
           </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-3 border-t border-zinc-100 pt-3 text-xs text-zinc-500 dark:border-zinc-800">
+        <div
+          class="flex flex-wrap items-center gap-2 border-t border-zinc-100 pt-2 text-[11px] text-zinc-500 dark:border-zinc-800 sm:gap-3 sm:pt-3 sm:text-xs"
+        >
           <span>
-            Hiển thị
             <strong class="text-zinc-800 dark:text-zinc-200">{{ filtered.length }}</strong>
-            / {{ events.length }} sự kiện
+            / {{ events.length }}
           </span>
-          <span v-if="highTodayCount > 0" class="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400">
-            <span class="inline-block h-2 w-2 rounded-sm bg-red-600" />
-            {{ highTodayCount }} tin High hôm nay (sau filter)
+          <span
+            v-if="highTodayCount > 0"
+            class="inline-flex items-center gap-1 text-red-600 dark:text-red-400"
+          >
+            <ImpactStars impact="High" :size="10" />
+            {{ highTodayCount }} High hôm nay
           </span>
         </div>
       </section>
 
-      <div v-if="loading && events.length === 0" class="py-16 text-center text-sm text-zinc-400">
+      <div v-if="loading && events.length === 0" class="py-12 text-center text-sm text-zinc-400">
         Đang tải lịch tin tức...
       </div>
 
       <div
         v-else-if="error"
-        class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300"
+        class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-300"
       >
         {{ error }}
         <button type="button" class="ml-2 underline" @click="load">Thử lại</button>
@@ -504,7 +479,7 @@ function fetchedLabel(): string {
 
       <div
         v-else-if="filtered.length === 0"
-        class="rounded-xl border border-dashed border-zinc-300 px-6 py-14 text-center dark:border-zinc-700"
+        class="rounded-xl border border-dashed border-zinc-300 px-4 py-10 text-center dark:border-zinc-700"
       >
         <p class="text-sm text-zinc-500">Không có sự kiện khớp filter.</p>
         <button
@@ -516,10 +491,10 @@ function fetchedLabel(): string {
         </button>
       </div>
 
-      <div v-else class="space-y-5">
+      <div v-else class="space-y-3 sm:space-y-5">
         <section v-for="group in grouped" :key="group.key">
           <div
-            class="sticky top-[57px] z-10 mb-2 flex items-center gap-2 rounded-lg bg-zinc-100/95 px-3 py-2 backdrop-blur dark:bg-zinc-900/95"
+            class="sticky top-[45px] z-10 mb-1.5 flex items-center gap-1.5 rounded-md bg-zinc-100/95 px-2 py-1.5 backdrop-blur dark:bg-zinc-900/95 sm:top-[57px] sm:mb-2 sm:gap-2 sm:rounded-lg sm:px-3 sm:py-2"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -527,21 +502,21 @@ function fetchedLabel(): string {
               fill="none"
               stroke="currentColor"
               stroke-width="2"
-              class="h-3.5 w-3.5 text-zinc-400"
+              class="h-3 w-3 text-zinc-400 sm:h-3.5 sm:w-3.5"
             >
               <rect x="3" y="4" width="18" height="18" rx="2" />
               <path d="M16 2v4M8 2v4M3 10h18" />
             </svg>
-            <h2 class="text-sm font-semibold capitalize">{{ group.label }}</h2>
-            <span class="text-[11px] text-zinc-400">{{ group.items.length }} sự kiện</span>
+            <h2 class="text-xs font-semibold capitalize sm:text-sm">{{ group.label }}</h2>
+            <span class="text-[10px] text-zinc-400 sm:text-[11px]">{{ group.items.length }}</span>
           </div>
 
           <div
-            class="overflow-hidden rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+            class="overflow-hidden rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 sm:rounded-xl"
           >
             <!-- Desktop header -->
             <div
-              class="hidden grid-cols-[72px_88px_56px_minmax(0,1.4fr)_72px_72px_72px] gap-2 border-b border-zinc-100 px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:border-zinc-800 sm:grid"
+              class="hidden grid-cols-[64px_80px_64px_minmax(0,1.4fr)_72px_72px_72px] gap-2 border-b border-zinc-100 px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:border-zinc-800 sm:grid"
             >
               <div>Giờ</div>
               <div>Currency</div>
@@ -556,69 +531,87 @@ function fetchedLabel(): string {
               <li
                 v-for="(item, idx) in group.items"
                 :key="`${group.key}-${idx}-${item.title}`"
-                class="grid grid-cols-1 gap-2 px-3 py-2.5 transition sm:grid-cols-[72px_88px_56px_minmax(0,1.4fr)_72px_72px_72px] sm:items-center sm:gap-2"
+                class="px-2 py-1.5 transition sm:grid sm:grid-cols-[64px_80px_64px_minmax(0,1.4fr)_72px_72px_72px] sm:items-center sm:gap-2 sm:px-3 sm:py-2.5"
                 :class="[
                   isPast(item.date) ? 'opacity-55' : '',
                   isSoon(item.date) ? 'bg-amber-50/70 dark:bg-amber-950/20' : '',
                 ]"
               >
-                <div class="flex items-center gap-2 sm:block">
-                  <span
-                    class="font-mono text-xs tabular-nums text-zinc-700 dark:text-zinc-200"
-                    :class="isSoon(item.date) ? 'font-semibold text-amber-700 dark:text-amber-300' : ''"
-                  >
-                    {{ formatTime(item.date) }}
-                  </span>
-                  <span
-                    v-if="isSoon(item.date)"
-                    class="rounded bg-amber-200/80 px-1.5 py-0.5 text-[9px] font-medium uppercase text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 sm:mt-1 sm:inline-block"
-                  >
-                    Sắp tới
-                  </span>
-                </div>
-
-                <div class="flex items-center gap-1.5">
-                  <span class="text-base leading-none" :title="currencyName(item.country)">
-                    {{ currencyFlag(item.country) }}
-                  </span>
-                  <span class="text-xs font-semibold tracking-wide">{{ item.country }}</span>
-                </div>
-
-                <div class="flex items-center gap-1.5" :title="impactLabel(item.impact)">
-                  <span class="inline-block h-3 w-3 rounded-sm" :class="impactClass(item.impact)" />
-                  <span class="text-[10px] text-zinc-400 sm:hidden">{{ impactLabel(item.impact) }}</span>
-                </div>
-
-                <div class="min-w-0">
-                  <div class="text-sm font-medium leading-snug">{{ item.title }}</div>
-                </div>
-
-                <div class="grid grid-cols-3 gap-2 text-xs sm:contents">
-                  <div class="sm:text-right">
-                    <div class="text-[9px] uppercase text-zinc-400 sm:hidden">Actual</div>
-                    <div
-                      class="tabular-nums"
-                      :class="
-                        item.actual
-                          ? 'font-semibold text-zinc-900 dark:text-zinc-100'
-                          : 'text-zinc-400'
-                      "
+                <!-- Mobile compact row -->
+                <div class="flex items-start gap-2 sm:contents">
+                  <div class="flex w-10 shrink-0 flex-col sm:w-auto sm:block">
+                    <span
+                      class="font-mono text-[11px] tabular-nums leading-tight text-zinc-700 dark:text-zinc-200 sm:text-xs"
+                      :class="isSoon(item.date) ? 'font-semibold text-amber-700 dark:text-amber-300' : ''"
                     >
-                      {{ displayValue(item.actual) }}
+                      {{ formatTime(item.date) }}
+                    </span>
+                    <span
+                      v-if="isSoon(item.date)"
+                      class="mt-0.5 hidden rounded bg-amber-200/80 px-1 py-px text-[8px] font-medium uppercase text-amber-800 dark:bg-amber-900/50 dark:text-amber-200 sm:inline-block"
+                    >
+                      Soon
+                    </span>
+                  </div>
+
+                  <div class="flex w-12 shrink-0 items-center gap-1 sm:w-auto sm:gap-1.5">
+                    <CurrencyFlag :code="item.country" :size="12" />
+                    <span class="text-[10px] font-semibold tracking-wide sm:text-xs">{{
+                      item.country
+                    }}</span>
+                  </div>
+
+                  <div class="flex w-[3.25rem] shrink-0 items-center sm:w-auto">
+                    <ImpactStars :impact="item.impact" :size="11" />
+                  </div>
+
+                  <div class="min-w-0 flex-1">
+                    <div class="text-[12px] font-medium leading-snug sm:text-sm">{{ item.title }}</div>
+                    <!-- Mobile values inline -->
+                    <div
+                      class="mt-0.5 flex flex-wrap gap-x-2 gap-y-0 text-[10px] tabular-nums text-zinc-500 sm:hidden"
+                    >
+                      <span>
+                        <span class="text-zinc-400">A</span>
+                        <span
+                          :class="
+                            item.actual
+                              ? 'ml-0.5 font-semibold text-zinc-800 dark:text-zinc-100'
+                              : 'ml-0.5'
+                          "
+                          >{{ displayValue(item.actual) }}</span
+                        >
+                      </span>
+                      <span>
+                        <span class="text-zinc-400">F</span>
+                        <span class="ml-0.5">{{ displayValue(item.forecast) }}</span>
+                      </span>
+                      <span>
+                        <span class="text-zinc-400">P</span>
+                        <span class="ml-0.5">{{ displayValue(item.previous) }}</span>
+                      </span>
                     </div>
                   </div>
-                  <div class="sm:text-right">
-                    <div class="text-[9px] uppercase text-zinc-400 sm:hidden">Forecast</div>
-                    <div class="tabular-nums text-zinc-600 dark:text-zinc-300">
-                      {{ displayValue(item.forecast) }}
-                    </div>
+                </div>
+
+                <!-- Desktop values -->
+                <div class="hidden text-xs sm:block sm:text-right">
+                  <div
+                    class="tabular-nums"
+                    :class="
+                      item.actual
+                        ? 'font-semibold text-zinc-900 dark:text-zinc-100'
+                        : 'text-zinc-400'
+                    "
+                  >
+                    {{ displayValue(item.actual) }}
                   </div>
-                  <div class="sm:text-right">
-                    <div class="text-[9px] uppercase text-zinc-400 sm:hidden">Previous</div>
-                    <div class="tabular-nums text-zinc-500">
-                      {{ displayValue(item.previous) }}
-                    </div>
-                  </div>
+                </div>
+                <div class="hidden text-xs tabular-nums text-zinc-600 dark:text-zinc-300 sm:block sm:text-right">
+                  {{ displayValue(item.forecast) }}
+                </div>
+                <div class="hidden text-xs tabular-nums text-zinc-500 sm:block sm:text-right">
+                  {{ displayValue(item.previous) }}
                 </div>
               </li>
             </ul>
@@ -626,7 +619,7 @@ function fetchedLabel(): string {
         </section>
       </div>
 
-      <p class="mt-6 text-center text-[11px] text-zinc-400">
+      <p class="mt-4 text-center text-[10px] text-zinc-400 sm:mt-6 sm:text-[11px]">
         Nguồn:
         <a
           href="https://nfs.faireconomy.media/ff_calendar_thisweek.json"
@@ -636,7 +629,7 @@ function fetchedLabel(): string {
         >
           FairEconomy / Forex Factory calendar
         </a>
-        · giờ hiển thị theo timezone máy bạn
+        · giờ theo timezone máy bạn
       </p>
     </main>
   </div>

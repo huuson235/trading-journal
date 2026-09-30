@@ -6,12 +6,13 @@ import tailwindcss from '@tailwindcss/vite'
 import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
     vue(),
     tailwindcss(),
-    vueDevTools(),
-  ],
+    // Chỉ bật khi dev — tránh inject code liên quan eval vào production
+    mode === 'development' ? vueDevTools() : null,
+  ].filter(Boolean),
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -23,4 +24,8 @@ export default defineConfig({
       '/uploads': 'http://localhost:3001',
     },
   },
-})
+  build: {
+    // Không để runtime compiler (cần unsafe-eval) lọt vào bundle
+    target: 'es2022',
+  },
+}))

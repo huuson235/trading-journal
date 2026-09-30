@@ -1,4 +1,5 @@
 export type Timeframe = 'W-H4-M15' | 'D-H1-M5' | 'MARCO' | 'SWING-H4' | 'SWING-H1' | ''
+export type Session = 'London' | 'Asia' | 'New York AM' | 'New York PM' | 'No session'
 export type TradeResult = 'Take profit' | 'Stop loss' | 'BE' | ''
 export type Ctc = 'bullish' | 'bearish' | 'sideways' | ''
 export type Bias = 'bullish' | 'bearish' | 'no_bias' | ''

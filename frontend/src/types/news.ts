@@ -18,37 +18,42 @@ export interface NewsCalendarResponse {
 
 export const IMPACT_OPTIONS = ['High', 'Medium', 'Low', 'Holiday'] as const
 
-export const CURRENCY_META: Record<
-  string,
-  { flag: string; name: string }
-> = {
-  USD: { flag: '🇺🇸', name: 'United States' },
-  EUR: { flag: '🇪🇺', name: 'Eurozone' },
-  GBP: { flag: '🇬🇧', name: 'United Kingdom' },
-  JPY: { flag: '🇯🇵', name: 'Japan' },
-  AUD: { flag: '🇦🇺', name: 'Australia' },
-  CAD: { flag: '🇨🇦', name: 'Canada' },
-  CHF: { flag: '🇨🇭', name: 'Switzerland' },
-  NZD: { flag: '🇳🇿', name: 'New Zealand' },
-  CNY: { flag: '🇨🇳', name: 'China' },
-  CNH: { flag: '🇨🇳', name: 'China' },
-  HKD: { flag: '🇭🇰', name: 'Hong Kong' },
-  SGD: { flag: '🇸🇬', name: 'Singapore' },
-  SEK: { flag: '🇸🇪', name: 'Sweden' },
-  NOK: { flag: '🇳🇴', name: 'Norway' },
-  DKK: { flag: '🇩🇰', name: 'Denmark' },
-  PLN: { flag: '🇵🇱', name: 'Poland' },
-  TRY: { flag: '🇹🇷', name: 'Turkey' },
-  MXN: { flag: '🇲🇽', name: 'Mexico' },
-  ZAR: { flag: '🇿🇦', name: 'South Africa' },
-  INR: { flag: '🇮🇳', name: 'India' },
-  KRW: { flag: '🇰🇷', name: 'South Korea' },
-  BRL: { flag: '🇧🇷', name: 'Brazil' },
-  RUB: { flag: '🇷🇺', name: 'Russia' },
+/** iso = mã quốc gia ISO 3166-1 alpha-2 (dùng cho ảnh cờ) */
+export const CURRENCY_META: Record<string, { iso: string; name: string }> = {
+  USD: { iso: 'us', name: 'United States' },
+  EUR: { iso: 'eu', name: 'Eurozone' },
+  GBP: { iso: 'gb', name: 'United Kingdom' },
+  JPY: { iso: 'jp', name: 'Japan' },
+  AUD: { iso: 'au', name: 'Australia' },
+  CAD: { iso: 'ca', name: 'Canada' },
+  CHF: { iso: 'ch', name: 'Switzerland' },
+  NZD: { iso: 'nz', name: 'New Zealand' },
+  CNY: { iso: 'cn', name: 'China' },
+  CNH: { iso: 'cn', name: 'China' },
+  HKD: { iso: 'hk', name: 'Hong Kong' },
+  SGD: { iso: 'sg', name: 'Singapore' },
+  SEK: { iso: 'se', name: 'Sweden' },
+  NOK: { iso: 'no', name: 'Norway' },
+  DKK: { iso: 'dk', name: 'Denmark' },
+  PLN: { iso: 'pl', name: 'Poland' },
+  TRY: { iso: 'tr', name: 'Turkey' },
+  MXN: { iso: 'mx', name: 'Mexico' },
+  ZAR: { iso: 'za', name: 'South Africa' },
+  INR: { iso: 'in', name: 'India' },
+  KRW: { iso: 'kr', name: 'South Korea' },
+  BRL: { iso: 'br', name: 'Brazil' },
+  RUB: { iso: 'ru', name: 'Russia' },
 }
 
-export function currencyFlag(code: string): string {
-  return CURRENCY_META[code.toUpperCase()]?.flag ?? '🏳️'
+export function currencyIso(code: string): string | null {
+  return CURRENCY_META[code.toUpperCase()]?.iso ?? null
+}
+
+export function currencyFlagUrl(code: string): string | null {
+  const iso = currencyIso(code)
+  if (!iso) return null
+  // flagcdn: h20 ổn định trên mọi trình duyệt (không dùng emoji)
+  return `https://flagcdn.com/h20/${iso}.png`
 }
 
 export function currencyName(code: string): string {
